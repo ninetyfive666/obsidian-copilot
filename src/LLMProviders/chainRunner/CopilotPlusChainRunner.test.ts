@@ -54,7 +54,7 @@ describe("CopilotPlusChainRunner", () => {
 
     it("turns a thrown localSearch error into a failed search the model can explain (https://github.com/Brevilabs/obsidian-copilot-private/issues/356)", async () => {
       (ToolManager.callTool as jest.Mock).mockRejectedValue(
-        new Error("Miyo is unavailable. Open Miyo, then retry vault search.")
+        new Error("Search backend is unavailable. Check your settings, then retry vault search.")
       );
 
       const { toolOutputs } = await executeToolCalls([
@@ -65,7 +65,7 @@ describe("CopilotPlusChainRunner", () => {
         {
           tool: "localSearch",
           output:
-            "<localSearch>\nSearch failed: Miyo is unavailable. Open Miyo, then retry vault search.\n</localSearch>",
+            "<localSearch>\nSearch failed: Search backend is unavailable. Check your settings, then retry vault search.\n</localSearch>",
         },
       ]);
     });

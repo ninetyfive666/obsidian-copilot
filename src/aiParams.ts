@@ -91,24 +91,6 @@ export interface ProjectConfig {
   UsageTimestamps: number;
 }
 
-export interface ModelConfig {
-  modelName: string;
-  streaming: boolean;
-  maxRetries: number;
-  maxConcurrency: number;
-  maxTokens?: number;
-  maxCompletionTokens?: number;
-  openAIApiKey?: string;
-  openAIOrgId?: string;
-  anthropicApiKey?: string;
-  cohereApiKey?: string;
-  apiKey?: string;
-  openAIProxyBaseUrl?: string;
-  groqApiKey?: string;
-  mistralApiKey?: string;
-  enableCors?: boolean;
-}
-
 export interface CustomModel {
   configuredModelId?: string;
   name: string;

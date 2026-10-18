@@ -26,7 +26,7 @@ export const LiveUpdateOff: StoryObj<RelevantNotesToolbarProps> = {
   args: { liveUpdate: { enabled: false, onChange: () => undefined } },
 };
 
-export const MiyoDisconnected: StoryObj<RelevantNotesToolbarProps> = {
+export const NoLiveUpdate: StoryObj<RelevantNotesToolbarProps> = {
   args: { liveUpdate: undefined },
 };
 

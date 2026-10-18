@@ -4,7 +4,11 @@ This file provides guidance to any coding agent when working with code in this r
 
 ## Overview
 
-Copilot for Obsidian is an AI-powered assistant plugin that integrates various LLM providers (OpenAI, Anthropic, Google, etc.) and coding agents (claude code, codex, opencode) with Obsidian. It provides chat interfaces, semantic search, and various AI-powered commands for note-taking and knowledge management.
+This is a **local-only fork** of [Copilot for Obsidian](https://github.com/logancyang/obsidian-copilot).
+The plugin is an AI assistant for Obsidian that runs **exclusively against local LLM servers**
+(llama.cpp llama-server, Ollama, LM Studio, any OpenAI-compatible endpoint). There is no cloud,
+no API-key marketplace, no licensing, no update checks, and no external network access by design.
+Keep it that way: do not reintroduce remote model providers, accounts, or third-party services.
 
 ## Commands
 
@@ -12,27 +16,47 @@ Copilot for Obsidian is an AI-powered assistant plugin that integrates various L
 - `npm run build` — production build (TypeScript check + minified output).
 - `npm run lint` / `npm run lint:fix` — ESLint check / autofix.
 - `npm run format` / `npm run format:check` — Prettier write / check.
-- **Before PR: always run `npm run format && npm run lint`.**
+- **Before committing: always run `npm run format && npm run lint && npm test`.**
 - `npm run test` — unit tests. Single test: `npm test -- -t "test name"`.
 - `npm run test:vault` — macOS-only build-and-deploy into `$COPILOT_TEST_VAULT_PATH`; see [`TESTING_GUIDE.md`](./designdocs/agents/TESTING_GUIDE.md).
 
 ## Core principles (apply to every change)
 
-- **Always write generalizable solutions.** No hardcoded folder names, file patterns, or special-case logic (no "piano notes" / "daily notes" branches). Make varying behavior configurable, not hardcoded.
-- **Never modify AI prompt content** — system prompts, model adapter prompts, etc. — unless the user explicitly asks.
-- **Never edit `RELEASES.md` outside a release PR.** If a rebase conflicts in `RELEASES.md`, resolve it to the base branch's version.
-- **Use stories for user-visible React work.** When a feature adds or changes a component or a meaningful visual state, add or update its adjacent `*.stories.tsx` file and verify the rendered states in the component gallery. Stories complement unit tests; non-visual changes do not require one. Follow the [`Component gallery workflow`](./designdocs/agents/TESTING_GUIDE.md#component-gallery-workflow).
-- **Referential stability.** Never return a freshly-allocated `[]` / `{}` for an "empty" slice; return a frozen module-level constant (canonical examples: `EMPTY_PROVIDERS` / `EMPTY_CONFIGURED_MODELS` / `EMPTY_BACKENDS` in `src/settings/model.ts`).
-- **Structure unit tests by module, class, and callable.** Use exactly one top-level `describe("moduleName", ...)` for the module under test; do not split the same subject across multiple top-level `describe` blocks. Within that module suite, wrap each class's tests in exactly one `describe("ClassName", ...)` so method ownership remains visible, then give each method exactly one nested `describe("methodName()", ...)` group. Keep module-level functions directly under the module suite, with exactly one `describe("functionName()", ...)` group per function. Merge cases that exercise the same callable. Separate same-callable groups only when a material test-lifecycle constraint makes merging misleading, and name that constraint in the groups' `describe` titles. Write `it(...)` descriptions that state the observable behavior without requiring the reader to inspect the test body.
-- **Write unit tests as executable specifications.** A developer or agent reading the `describe`/`it` outline should understand the module's purpose and observable contract without opening its implementation. Establish normal behavior before boundary, failure, and regression cases; name each case by its condition and expected outcome. Use concrete fixtures and assert the promised result, not just internal calls. For behavior changes, verify the test fails for the intended reason before making it pass, then refactor with tests green. → [`Test design workflow`](./designdocs/agents/TESTING_GUIDE.md#test-design-workflow)
-- **Preserve provenance for new behavioral branches and edge cases.** When a change adds a conditional branch or explicit edge-case path, include the originating GitHub issue's full URL in both the nearby code comment that explains why the path exists and the `it(...)` description that covers it. If no issue exists, create one before landing the behavior. Explain the user or reliability failure that justified the path, not its mechanics.
-- **Pair every production TypeScript function and method with unit coverage.** Directly test exported and public callables; cover private and module-local helpers through their observable public contract unless direct isolation materially improves clarity. Test-only helper functions are exempt.
-- **Never wait for async work by ticks or timers.** No `setTimeout(…, 0)`, `queueMicrotask`, or `await Promise.resolve()` to "let pending work land". Await the work itself, handle events where their order is defined, or signal completion explicitly. → [`Async ordering`](./designdocs/agents/STYLE_GUIDE.md#async-ordering)
+- **Local-only invariant.** All model traffic must go to user-configured local endpoints
+  (`settings.providers` → openai-compatible). No new `fetch`/`requestUrl` to external hosts.
+- **Always write generalizable solutions.** No hardcoded folder names, file patterns, or
+  special-case logic (no "piano notes" / "daily notes" branches). Make varying behavior
+  configurable, not hardcoded.
+- **Never modify AI prompt content** — system prompts, model adapter prompts, etc. — unless the
+  user explicitly asks.
+- **Use stories for user-visible React work.** When a feature adds or changes a component or a
+  meaningful visual state, add or update its adjacent `*.stories.tsx` file and verify the rendered
+  states in the component gallery. Stories complement unit tests; non-visual changes do not
+  require one. Follow the [`Component gallery workflow`](./designdocs/agents/TESTING_GUIDE.md#component-gallery-workflow).
+- **Referential stability.** Never return a freshly-allocated `[]` / `{}` for an "empty" slice;
+  return a frozen module-level constant (canonical examples: `EMPTY_PROVIDERS` /
+  `EMPTY_CONFIGURED_MODELS` / `EMPTY_BACKENDS` in `src/settings/model.ts`).
+- **Structure unit tests by module, class, and callable.** One top-level `describe("moduleName", ...)`
+  per module; one `describe("ClassName", ...)` per class; one nested `describe("methodName()", ...)`
+  per method; `it(...)` names state the observable behavior. → [`Test design workflow`](./designdocs/agents/TESTING_GUIDE.md#test-design-workflow)
+- **Preserve provenance for new behavioral branches and edge cases.** Include the originating
+  GitHub issue's full URL in the nearby comment and the `it(...)` description.
+- **Pair every production TypeScript function and method with unit coverage.**
+- **Never wait for async work by ticks or timers.** No `setTimeout(…, 0)`, `queueMicrotask`, or
+  `await Promise.resolve()` to "let pending work land". Await the work itself.
+  → [`Async ordering`](./designdocs/agents/STYLE_GUIDE.md#async-ordering)
 - **Never call `console` directly** — use `logInfo()` / `logWarn()` / `logError()` from `@/logger`.
-- **Every JavaScript/TypeScript comment links a GitHub issue.** A comment may only record a tricky decision tied to a specific issue: the one-line why plus the issue's full URL (`https://github.com/OWNER/REPO/issues/N`). Everything else, including JSDoc, section banners, restated logic, and issue-less TODOs, is expressed through names, types, and tests. If a decision needs explaining and no issue exists, file one. When you change code under an issue-linked comment, re-check the comment against its issue and update or delete it. `copilot/issue-linked-comments` enforces this in `npm run lint`; tool directives (`eslint-disable`, `@ts-expect-error`, `prettier-ignore`, …) are exempt. → [`STYLE_GUIDE.md`](./designdocs/agents/STYLE_GUIDE.md)
-- **Keep React styling in Tailwind.** Put static styles on React-owned elements with Tailwind utilities, and reuse a shared component when the same visual pattern appears more than once. Do not add one-off selector families such as `.feature`, `.feature-copy`, and `.feature-actions` to `src/styles/tailwind.css` just to move utility declarations out of JSX. Add custom CSS only for markup React does not own or a styling contract Tailwind cannot express, and document that constraint beside the rule. Never edit `styles.css` (generated), use inline `style` for static values, or add arbitrary font sizes; wrap composed class strings in `cn()`. → [`STYLE_GUIDE.md`](./designdocs/agents/STYLE_GUIDE.md)
-- **TypeScript:** `@/` absolute imports; `interface` for shapes, `type` for unions. **React:** custom hooks, props interfaces above components. → [`STYLE_GUIDE.md`](./designdocs/agents/STYLE_GUIDE.md)
-- **Never use the global `app`** (footgun in popouts, hides dependencies); thread it via `useApp()` or a parameter. → [`PLUGIN_DEV_GUIDE.md`](./designdocs/agents/PLUGIN_DEV_GUIDE.md)
+- **Every JavaScript/TypeScript comment links a GitHub issue.** A comment may only record a
+  tricky decision tied to a specific issue: the one-line why plus the issue's full URL.
+  Everything else is expressed through names, types, and tests. `copilot/issue-linked-comments`
+  enforces this in `npm run lint`.
+- **Keep React styling in Tailwind.** Static styles on React-owned elements as utilities; reuse a
+  shared component when a visual pattern repeats. Never edit `styles.css` (generated); wrap
+  composed class strings in `cn()`. → [`STYLE_GUIDE.md`](./designdocs/agents/STYLE_GUIDE.md)
+- **TypeScript:** `@/` absolute imports; `interface` for shapes, `type` for unions. **React:**
+  custom hooks, props interfaces above components. → [`STYLE_GUIDE.md`](./designdocs/agents/STYLE_GUIDE.md)
+- **Never use the global `app`** (footgun in popouts, hides dependencies); thread it via
+  `useApp()` or a parameter. → [`PLUGIN_DEV_GUIDE.md`](./designdocs/agents/PLUGIN_DEV_GUIDE.md)
 
 ## Task-specific guides
 
@@ -45,96 +69,13 @@ Read the matching guide when your task touches that area — they aren't loaded 
 | writing code: DI/structure, TypeScript, React, comments, CSS/Tailwind | [`designdocs/agents/STYLE_GUIDE.md`](./designdocs/agents/STYLE_GUIDE.md)                        |
 | touching plugin runtime: the `app`, network requests, popout windows  | [`designdocs/agents/PLUGIN_DEV_GUIDE.md`](./designdocs/agents/PLUGIN_DEV_GUIDE.md)              |
 | running a multi-step dev session                                      | [`designdocs/agents/PROCESS_GUIDE.md`](./designdocs/agents/PROCESS_GUIDE.md)                    |
-| changing user-facing behavior                                         | [`designdocs/agents/DOCS_GUIDE.md`](./designdocs/agents/DOCS_GUIDE.md)                          |
-| reviewing code or preparing an Obsidian submission                    | [`designdocs/OBSIDIAN_COMMUNITY_REVIEW.md`](./designdocs/OBSIDIAN_COMMUNITY_REVIEW.md)          |
 
 ## Important notes
 
-- The plugin supports multiple LLM providers with custom endpoints.
-- Vector store requires rebuilding when switching embedding providers.
-- Settings are versioned — migrations may be needed.
-- Local model support via Ollama / LM Studio.
-- Rate limiting is implemented for all API calls.
-- Message & chat architecture (Repository → Manager → UIState → UI; single `MessageRepository`; per-project isolation) → [`designdocs/MESSAGE_ARCHITECTURE.md`](./designdocs/MESSAGE_ARCHITECTURE.md).
-- Tech debt and known issues → [`designdocs/todo/TECHDEBT.md`](./designdocs/todo/TECHDEBT.md). Current session plan → [`TODO.md`](./TODO.md).
+- The only model path is **openai-compatible**: local server base URL + optional key.
+  Provider metadata lives in `src/constants.ts` (`ChatModelProviders`), the model data model in
+  `src/modelManagement/` (see [`designdocs/todo/models_management_redesign_cleanup.md`](./designdocs/todo/models_management_redesign_cleanup.md)).
+- Settings are versioned — retired cloud fields are stripped by `RETIRED_SETTINGS_FIELDS` in
+  `src/settings/model.ts`; keep that list current when removing settings.
+- Local server setup (user-facing) is documented in [`local_copilot.md`](./local_copilot.md).
 - Available Tailwind tokens/classes → [`tailwind.config.js`](./tailwind.config.js).
-
-## Obsidian review guidelines
-
-When reviewing code or preparing a PR that changes plugin source, CSS, package metadata, or dependencies, run `npm run review:obsidian` and inspect its warning output. Obsidian review errors are blockers. Fix warnings only when runtime, UI, and persisted behavior remain equivalent; leave risky warnings visible and nonblocking.
-
-Review changed lines for desktop-only Node imports, `fetch` outside justified streaming adapters, async callbacks passed to void-returning APIs, global `app` access, console use, deprecated APIs, runtime dependency replacements, native DOM creation instead of Obsidian helpers, external CSS URLs, `!important`, and `:has()`. Never suppress, ignore, or downgrade a review rule just to make the gate green.
-
-If the authenticated community review finds something the local gate missed, first check the pinned official Obsidian lint packages, then add a regression fixture outside source roots. See [`designdocs/OBSIDIAN_COMMUNITY_REVIEW.md`](./designdocs/OBSIDIAN_COMMUNITY_REVIEW.md) for the parity and risk policy.
-
-<!-- brevilabs-review-guidelines:start (synced from Brevilabs/brevilabs-skills — edit there, not here) -->
-
-## Review guidelines
-
-Apply these in addition to the built-in review. Report only problems
-introduced or exposed by this pull request, and describe the concrete failure
-scenario for each finding rather than giving general advice.
-
-Priorities, in order:
-
-1. **Correctness** — logic errors, data loss, unhandled failure paths,
-   concurrency hazards.
-2. **Security** — authorization bypass, injection, secrets or private data
-   leaving the codebase.
-3. **Breaking changes and migrations** — changed function signatures, renamed
-   or removed exports, altered return shapes, changed defaults, tightened
-   validation; persisted schemas, settings files, and serialized formats that
-   already-written data must still load. A change that needs a migration and
-   ships without one is a defect. When a migration exists, check that it
-   handles already-in-the-wild states, not just the happy path.
-4. **Code budget** — added lines are spend, not progress. A change that
-   solves the problem in fewer concepts beats one that solves it in more; the
-   best diff is the smallest one that does the job.
-5. **Tests** — changed behavior, failure paths, and boundary cases are
-   covered, and tests assert behavior rather than implementation detail.
-
-Severity calibration:
-
-- Treat as P1: an unhandled breaking change to a public API, plugin interface,
-  CLI flag, or wire format; a change requiring a migration that ships without
-  one; a data-corrupting or destructive operation; an authorization bypass; a
-  reproducible crash.
-- Also treat as P1: a diff carrying substantial code the problem does not
-  require — a speculative abstraction with a single caller, configurability
-  nothing asks for, premature optimization without a measurement showing the
-  need, defensive branches guarding states that cannot occur, or a
-  reimplementation of a helper that already exists in the codebase. Rank
-  smaller instances of the same problems P2/P3 rather than dropping them. An
-  over-engineering finding must name the simpler shape that solves the same
-  problem; a bare "consider simplifying" is not a finding.
-- Never report naming, formatting, or style that automated checks enforce, at
-  any priority.
-
-Code-budget checks:
-
-- Prefer fixes that remove code; say so when a net-negative diff is available.
-- Flag dead code the change itself creates — superseded branches, obsolete
-  fallbacks, stale tests — deletion belongs in the same PR.
-- Do not suggest broad refactors of pre-existing code unless required to fix
-  a reported defect; the budget applies to what this PR adds, not to what was
-  already there.
-
-## Responding to review comments
-
-Reply with the endpoint that publishes immediately, where `ROOT_COMMENT_ID` is
-the thread's top-level comment:
-
-```bash
-gh api -X POST repos/OWNER/REPO/pulls/PR/comments/ROOT_COMMENT_ID/replies -f body="..."
-```
-
-Never open a review draft: `POST /pulls/PR/reviews` without an `event` (and the
-UI's "Start a review") leaves the reply _pending_, which means invisible — it
-never reaches the reviewer, it is absent from the comments API, and its thread
-still reads as unanswered. Before finishing, confirm none exists:
-
-```bash
-gh api repos/OWNER/REPO/pulls/PR/reviews --jq '[.[]|select(.state=="PENDING")]|length'   # must be 0
-```
-
-<!-- brevilabs-review-guidelines:end -->

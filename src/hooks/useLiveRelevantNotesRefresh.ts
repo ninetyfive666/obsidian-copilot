@@ -14,8 +14,8 @@ interface UseLiveRelevantNotesRefreshOptions {
 
 /**
  * Re-query relevant notes while the active note is being written. Each write opens a window
- * during which the note is re-queried, because Miyo re-embeds a few seconds after the file
- * lands on disk. https://github.com/Brevilabs/obsidian-copilot-private/issues/362
+ * during which the note is re-queried, giving the search index time to catch up after the
+ * file lands on disk. https://github.com/Brevilabs/obsidian-copilot-private/issues/362
  *
  * @param options - Runtime access, the enablement flag, the note being related,
  *   and the callback that re-runs the query.

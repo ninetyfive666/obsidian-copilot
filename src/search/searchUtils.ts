@@ -158,7 +158,7 @@ export function createCopilotPatternFilter(app: App): (path: string) => boolean 
     }
     const file = app.vault.getAbstractFileByPath(path);
     if (!(file instanceof TFile)) {
-      // Miyo can return a stale or remote path that the current vault cannot
+      // Retriever results can reference stale paths that the current vault cannot
       // resolve. Folder, extension, and note-title rules still have enough path
       // data to evaluate. Tags and properties do not, so fail closed instead of
       // letting a possibly excluded current-vault result through.
