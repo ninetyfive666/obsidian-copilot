@@ -509,7 +509,7 @@ export class ContextProcessor {
         }
 
         if (!isPlusChain(currentChain) && !isTextReadableFile(note)) {
-          logWarn(`File type ${note.extension} requires Copilot Plus mode for context processing.`);
+          logWarn(`File type ${note.extension} requires agent mode for context processing.`);
           new Notice(RESTRICTION_MESSAGES.NON_MARKDOWN_FILES_RESTRICTED);
           return;
         }

@@ -7,6 +7,7 @@
 
 # npm
 node_modules
+.npm-cache/
 
 # Don't include the compiled main.js file in the repo.
 # They should be uploaded to GitHub releases instead.
@@ -16,9 +17,10 @@ styles.css
 # Exclude sourcemaps
 *.map
 
-# obsidian
+# obsidian vault artifacts
 data.json
 data/
+.copilot/
 
 # Exclude macOS Finder (System Explorer) View States
 .DS_Store
@@ -33,10 +35,6 @@ data/
 # Development session tracking
 TODO.md
 
-# ACP full-frame debug log (vault sidecar, may contain prompt/tool data)
-copilot/acp-frames.ndjson
-copilot/acp-frames.old.ndjson
-
-# Models.dev catalog cache (disposable runtime cache under .copilot/)
-.copilot/model-catalog-cache.json
-.otacon/
+# Agent scratch/debug artifacts
+.agent-scratch/
+tsc-errors.txt

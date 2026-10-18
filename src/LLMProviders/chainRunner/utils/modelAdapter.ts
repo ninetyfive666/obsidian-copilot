@@ -546,23 +546,21 @@ class CopilotPlusModelAdapter extends BaseModelAdapter {
     );
 
     sections.push({
-      id: "copilot-plus-guidelines",
-      label: "Copilot Plus model guidance",
+      id: "agent-model-guidelines",
+      label: "Agent model guidance",
       source:
         "src/LLMProviders/chainRunner/utils/modelAdapter.ts#CopilotPlusModelAdapter.buildSystemPromptSections",
       content: `🚨 CRITICAL: NO HALLUCINATED TOOL CALLS OR SOURCES 🚨
 
-You are a Copilot Plus model. You MUST follow these rules strictly:
+You are an agent model. You MUST follow these rules strictly:
 
 ## Tool Call Integrity
 - You can ONLY reference results from tools you have ACTUALLY called in this conversation
-- NEVER claim to have performed a web search unless you called the webSearch tool AND received results
 - NEVER claim to have searched notes unless you called localSearch AND received results
-- If you want to search the web, you MUST call the webSearch tool first - do not make up results
+- If you want to search notes, you MUST call localSearch first - do not make up results
 
 ## Citation Rules
 - Every citation [1], [2], etc. MUST correspond to a real source returned by a tool
-- Do NOT invent sources like "General web search results for X" unless webSearch was actually called
 - If you only called localSearch, your citations can ONLY reference notes from that search
 - Count your actual tool calls - if you only made 1 tool call, you cannot have citations from multiple different tools
 
@@ -571,7 +569,7 @@ Ask yourself: "Did I actually call this tool and receive this result?"
 - If YES: You may cite it
 - If NO: Do NOT cite it or claim you did
 
-REMEMBER: It is better to say "I only searched your notes, not the web" than to fabricate web search results.
+REMEMBER: It is better to say "I only searched your notes" than to fabricate results.
 
 ## Formatting Guidelines
 - AVOID using markdown tables - they often render poorly in chat interfaces

@@ -21,14 +21,6 @@ export class MissingApiKeyError extends Error {
   }
 }
 
-export class MissingPlusLicenseError extends Error {
-  constructor(message: string = "Copilot Plus license key is not configured.") {
-    super(message);
-    this.name = "MissingPlusLicenseError";
-    Object.setPrototypeOf(this, MissingPlusLicenseError.prototype);
-  }
-}
-
 export class MissingModelKeyError extends Error {
   constructor(message: string = "No model key found. Please select a model in settings.") {
     super(message);

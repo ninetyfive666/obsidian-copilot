@@ -3,7 +3,6 @@ import { Button } from "@/components/ui/button";
 import { TabContent, TabItem, type TabItem as TabItemType } from "@/components/ui/setting-tabs";
 import { PluginProvider } from "@/contexts/PluginContext";
 import { TabProvider, useTab } from "@/contexts/TabContext";
-import { useLatestVersion } from "@/hooks/useLatestVersion";
 import CopilotPlugin from "@/main";
 import { ByokPanel, ModelManagementProvider } from "@/modelManagement";
 import { resetSettings } from "@/settings/model";
@@ -79,7 +78,6 @@ interface SettingsMainV2Props {
 
 const SettingsMainV2: React.FC<SettingsMainV2Props> = ({ plugin, initialTab = "basic" }) => {
   const [resetKey, setResetKey] = React.useState(0);
-  const { latestVersion, hasUpdate } = useLatestVersion(plugin.manifest.version);
 
   const handleReset = () => {
     const modal = new ResetSettingsConfirmModal(plugin.app, () => {
@@ -106,25 +104,6 @@ const SettingsMainV2: React.FC<SettingsMainV2Props> = ({ plugin, initialTab = "b
                     <span className="tw-text-xs tw-font-normal tw-text-muted">
                       v{plugin.manifest.version}
                     </span>
-                    {latestVersion && (
-                      <>
-                        {hasUpdate ? (
-                          <a
-                            href="obsidian://show-plugin?id=copilot"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="tw-text-xs tw-font-normal tw-text-accent hover:tw-underline"
-                          >
-                            (Update to v{latestVersion})
-                          </a>
-                        ) : (
-                          <span className="tw-text-xs tw-font-normal tw-text-normal">
-                            {" "}
-                            (up to date)
-                          </span>
-                        )}
-                      </>
-                    )}
                   </div>
                 </div>
                 <div className="tw-self-end sm:tw-self-auto">

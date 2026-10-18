@@ -25,20 +25,18 @@ export function ChatModeSelector({
           ) : (
             <div className="tw-flex tw-items-center tw-gap-1">
               <Sparkles className="tw-size-4" />
-              copilot plus
+              agent
             </div>
           )}
           <ChevronDown className="tw-mt-0.5 tw-size-5" />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start">
-        <DropdownMenuItem onSelect={() => onModeChange(ChainType.LLM_CHAIN)}>
-          chat
-        </DropdownMenuItem>
+        <DropdownMenuItem onSelect={() => onModeChange(ChainType.LLM_CHAIN)}>chat</DropdownMenuItem>
         <DropdownMenuItem onSelect={() => onModeChange(ChainType.COPILOT_PLUS_CHAIN)}>
           <div className="tw-flex tw-items-center tw-gap-1">
             <Sparkles className="tw-size-4" />
-            copilot plus
+            agent
           </div>
         </DropdownMenuItem>
       </DropdownMenuContent>

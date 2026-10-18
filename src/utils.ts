@@ -1,4 +1,3 @@
-import { compareSemver } from "@/utils/semver";
 import { Buffer } from "buffer/";
 
 import { ChainType } from "@/chainType";
@@ -667,82 +666,6 @@ export async function insertIntoEditor(app: App, message: string, replace: boole
   }
 
   finalizeInsertion();
-}
-
-export function isNewerVersion(latest: string, current: string): boolean {
-  return compareSemver(latest, current) > 0;
-}
-
-const LATEST_RELEASE_API_URL =
-  "https://api.github.com/repos/logancyang/obsidian-copilot/releases/latest";
-
-export interface LatestRelease {
-  body: string;
-  htmlUrl: string;
-  version: string;
-}
-
-interface GitHubReleaseResponse {
-  body?: unknown;
-  html_url?: unknown;
-  assets?: { name?: unknown; browser_download_url?: unknown }[];
-}
-
-export async function checkLatestVersion(): Promise<{
-  version: string | null;
-  error: string | null;
-  release: LatestRelease | null;
-}> {
-  try {
-    const response = await requestUrl({
-      url: LATEST_RELEASE_API_URL,
-      method: "GET",
-    });
-    const responseRelease = response.json as GitHubReleaseResponse;
-    const manifestAsset = Array.isArray(responseRelease?.assets)
-      ? responseRelease.assets.find((asset) => asset?.name === "manifest.json")
-      : undefined;
-    if (
-      typeof manifestAsset?.browser_download_url !== "string" ||
-      !manifestAsset.browser_download_url
-    ) {
-      throw new Error("The latest Copilot release has no manifest.json asset.");
-    }
-    const manifestResponse = await requestUrl({
-      url: manifestAsset.browser_download_url,
-      method: "GET",
-    });
-    const manifest = manifestResponse.json as { version?: unknown } | null;
-    const version = manifest?.version;
-    if (
-      typeof version !== "string" ||
-      !/^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-[\da-zA-Z-]+(?:\.[\da-zA-Z-]+)*)?(?:\+[\da-zA-Z-]+(?:\.[\da-zA-Z-]+)*)?$/.test(
-        version
-      )
-    ) {
-      throw new Error("The latest Copilot manifest has no valid version.");
-    }
-
-    const release: LatestRelease = {
-      body: typeof responseRelease.body === "string" ? responseRelease.body : "",
-      htmlUrl:
-        typeof responseRelease.html_url === "string"
-          ? responseRelease.html_url
-          : "https://github.com/logancyang/obsidian-copilot/releases/latest",
-      version,
-    };
-    return {
-      version: release.version,
-      error: null,
-      release,
-    };
-  } catch (error) {
-    return {
-      version: null,
-      error: error instanceof Error ? error.message : "Failed to check for updates",
-      release: null,
-    };
-  }
 }
 
 export function isOSeriesModel(model: BaseChatModel | string): boolean {

@@ -15,7 +15,7 @@ describe("ChatModeSelector", () => {
   });
 
   describe("ChatModeSelector()", () => {
-    it("offers plain chat and the Copilot Plus chain https://github.com/Brevilabs/obsidian-copilot-private/issues/286", () => {
+    it("offers plain chat and the agent chain https://github.com/Brevilabs/obsidian-copilot-private/issues/286", () => {
       const onModeChange = jest.fn();
       render(
         <ChatModeSelector
@@ -26,13 +26,13 @@ describe("ChatModeSelector", () => {
       );
 
       expect(screen.getAllByText("chat").length).toBeGreaterThan(0);
-      expect(screen.getByText("copilot plus")).toBeTruthy();
+      expect(screen.getByText("agent")).toBeTruthy();
 
-      fireEvent.click(screen.getByRole("menuitem", { name: "copilot plus" }));
+      fireEvent.click(screen.getByRole("menuitem", { name: "agent" }));
       expect(onModeChange).toHaveBeenCalledWith(ChainType.COPILOT_PLUS_CHAIN);
     });
 
-    it("switches from the Copilot Plus chain back to plain chat https://github.com/Brevilabs/obsidian-copilot-private/issues/286", () => {
+    it("switches from the agent chain back to plain chat https://github.com/Brevilabs/obsidian-copilot-private/issues/286", () => {
       const onModeChange = jest.fn();
       render(
         <ChatModeSelector
