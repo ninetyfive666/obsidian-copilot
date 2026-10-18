@@ -1,6 +1,5 @@
 import { StructuredTool } from "@langchain/core/tools";
 import { logError, logInfo, logWarn } from "@/logger";
-import { checkIsPaidUser, isSelfHostModeValid } from "@/plusUtils";
 import { getSettings } from "@/settings/model";
 import { ToolManager } from "@/tools/toolManager";
 import { ToolRegistry } from "@/tools/ToolRegistry";
@@ -47,17 +46,6 @@ export async function executeSequentialToolCall(
 
     const registry = ToolRegistry.getInstance();
     const metadata = registry.getToolMetadata(toolCall.name);
-
-    if (metadata?.isPlusOnly) {
-      const isPaidUser = await checkIsPaidUser(undefined, { trigger: "tool_call" });
-      if (!isPaidUser && !isSelfHostModeValid()) {
-        return {
-          toolName: toolCall.name,
-          result: `Error: ${getToolDisplayName(toolCall.name)} requires a Copilot Plus subscription`,
-          success: false,
-        };
-      }
-    }
 
     const toolArgs = { ...toolCall.args };
 
@@ -121,11 +109,6 @@ export async function executeSequentialToolCall(
 }
 
 function getToolDisplayName(toolName: string): string {
-  if (toolName === "localSearch") {
-    const settings = getSettings();
-    return settings.enableMiyo ? "vault search (Miyo)" : "vault search (index-free)";
-  }
-
   const displayNameMap: Record<string, string> = {
     webSearch: "web search",
     getFileTree: "file tree",

@@ -1,4 +1,4 @@
-import * as agentWelcomeStories from "@/agentMode/ui/AgentWelcomeCard.stories";
+import * as projectFolderIconStories from "@/components/ui/ProjectFolderIcon.stories";
 import * as galleryHostStories from "@/components/gallery-hosts.stories";
 import * as badgeStories from "@/components/ui/badge.stories";
 import * as buttonStories from "@/components/ui/button.stories";
@@ -166,8 +166,8 @@ describe("Gallery", () => {
       const catalog = createGalleryCatalog(
         [
           {
-            componentId: "@/agentMode/ui/AgentWelcomeCard",
-            storyModule: agentWelcomeStories,
+            componentId: "@/components/ui/ProjectFolderIcon",
+            storyModule: projectFolderIconStories,
           },
           { componentId: null, storyModule: galleryHostStories },
           { componentId: "@/components/ui/badge", storyModule: badgeStories },
@@ -179,7 +179,6 @@ describe("Gallery", () => {
       expect(catalog.componentCount).toBe(5);
       expect(catalog.coveredCount).toBe(3);
       expect(catalog.stories.map((story) => story.id)).toEqual([
-        "Agent Mode/Agent Welcome Card/Default",
         "Gallery/Host Environments/DefaultLeaf",
         "Gallery/Host Environments/DeleteConfirmation",
         "Gallery/Host Environments/ModelPreferences",
@@ -191,6 +190,7 @@ describe("Gallery", () => {
         "UI/Button/Disabled",
         "UI/Button/Sizes",
         "UI/Button/Variants",
+        "UI/Project Folder Icon/Default",
       ]);
       expect(
         catalog.stories.find((story) => story.id === "Gallery/Host Environments/DefaultLeaf")
@@ -206,10 +206,6 @@ describe("Gallery", () => {
         const renderedStory = render(
           <AppContext.Provider value={GALLERY_APP}>{story.render()}</AppContext.Provider>
         );
-        if (story.id.startsWith("Agent Mode/")) {
-          fireEvent.click(renderedStory.getByRole("button", { name: "Dismiss" }));
-          fireEvent.click(renderedStory.getByRole("button", { name: "New project" }));
-        }
         renderedStory.unmount();
       }
     });

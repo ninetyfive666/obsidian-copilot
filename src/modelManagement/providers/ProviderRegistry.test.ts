@@ -36,8 +36,8 @@ function makeFakeApp(): { app: App; secrets: SecretStore } {
   return { app, secrets };
 }
 
-const anthropicStub: ProviderAdapter = {
-  providerType: "anthropic",
+const openaiCompatibleStub: ProviderAdapter = {
+  providerType: "openai-compatible",
   extrasSchema: z.object({}).strict(),
   buildLangChainClient: () => {
     throw new Error("not used in test");
@@ -64,7 +64,7 @@ describe("ProviderRegistry", () => {
     secrets = fake.secrets;
     KeychainService.getInstance(app);
     adapters = new ProviderAdapterRegistry();
-    adapters.register(anthropicStub);
+    adapters.register(openaiCompatibleStub);
     registry = new ProviderRegistry(app, adapters);
   });
 
@@ -72,7 +72,7 @@ describe("ProviderRegistry", () => {
     it("persists a new provider with a minted id, its addedAt time, and no API key pointer", async () => {
       const before = Date.now();
       const id = await registry.add({
-        providerType: "anthropic",
+        providerType: "openai-compatible",
         displayName: "Anthropic (prod)",
         origin: { kind: "byok" },
       });
@@ -82,7 +82,7 @@ describe("ProviderRegistry", () => {
       const row = registry.get(id);
       expect(row).toBeDefined();
       expect(row?.displayName).toBe("Anthropic (prod)");
-      expect(row?.providerType).toBe("anthropic");
+      expect(row?.providerType).toBe("openai-compatible");
       expect(row?.origin).toEqual({ kind: "byok" });
       expect(row?.addedAt).toBeGreaterThanOrEqual(before);
       expect(row?.apiKeyKeychainId).toBeNull();
@@ -92,7 +92,7 @@ describe("ProviderRegistry", () => {
   describe("get()", () => {
     it("returns the persisted row and undefined for an unknown provider", async () => {
       const id = await registry.add({
-        providerType: "anthropic",
+        providerType: "openai-compatible",
         displayName: "A",
         origin: { kind: "byok" },
       });
@@ -104,22 +104,22 @@ describe("ProviderRegistry", () => {
   describe("listByOrigin()", () => {
     it("returns stable references while settings are unchanged", async () => {
       await registry.add({
-        providerType: "anthropic",
+        providerType: "openai-compatible",
         displayName: "A",
         origin: { kind: "byok" },
       });
       await registry.add({
-        providerType: "anthropic",
+        providerType: "openai-compatible",
         displayName: "B",
-        origin: { kind: "agent", agentType: "claude" },
+        origin: { kind: "byok", catalogProviderId: "lmstudio" },
       });
       const rows = registry.listByOrigin("byok");
       expect(registry.listByOrigin("byok")).toBe(rows);
-      expect(rows).toHaveLength(1);
+      expect(rows).toHaveLength(2);
     });
-    it("returns the same empty list for every origin that has no providers", () => {
+    it("returns the same empty list for an empty registry", () => {
       const empty1 = registry.listByOrigin("byok");
-      const empty2 = registry.listByOrigin("copilot-plus");
+      const empty2 = registry.listByOrigin("byok");
       expect(empty1).toBe(empty2);
       expect(empty1.length).toBe(0);
     });
@@ -128,7 +128,7 @@ describe("ProviderRegistry", () => {
   describe("update()", () => {
     it("applies the patch but keeps providerId, addedAt, providerType, and origin unchanged", async () => {
       const id = await registry.add({
-        providerType: "anthropic",
+        providerType: "openai-compatible",
         displayName: "Original",
         origin: { kind: "byok" },
       });
@@ -140,8 +140,8 @@ describe("ProviderRegistry", () => {
         ...({
           providerId: "hacked",
           addedAt: 1,
-          providerType: "openai",
-          origin: { kind: "agent", agentType: "claude" },
+          providerType: "not-a-type",
+          origin: { kind: "byok", catalogProviderId: "hacked" },
         } as Record<string, unknown>),
       });
       const row = registry.get(id)!;
@@ -149,7 +149,7 @@ describe("ProviderRegistry", () => {
       expect(row.baseUrl).toBe("https://example.test");
       expect(row.providerId).toBe(id);
       expect(row.addedAt).toBe(originalAddedAt);
-      expect(row.providerType).toBe("anthropic");
+      expect(row.providerType).toBe("openai-compatible");
       expect(row.origin).toEqual({ kind: "byok" });
     });
     it("rejects an unknown providerId", async () => {
@@ -157,7 +157,7 @@ describe("ProviderRegistry", () => {
     });
     it("ignores an attempt to overwrite apiKeyKeychainId", async () => {
       const id = await registry.add({
-        providerType: "anthropic",
+        providerType: "openai-compatible",
         displayName: "A",
         origin: { kind: "byok" },
       });
@@ -176,7 +176,7 @@ describe("ProviderRegistry", () => {
   describe("setApiKey()", () => {
     it("mints the keychain pointer on the first key and reuses it when the key is rotated", async () => {
       const id = await registry.add({
-        providerType: "anthropic",
+        providerType: "openai-compatible",
         displayName: "A",
         origin: { kind: "byok" },
       });
@@ -195,7 +195,7 @@ describe("ProviderRegistry", () => {
 
     it("re-writes a key whose keychain entry went missing behind a live pointer (https://github.com/Brevilabs/obsidian-copilot-private/issues/472)", async () => {
       const id = await registry.add({
-        providerType: "anthropic",
+        providerType: "openai-compatible",
         displayName: "A",
         origin: { kind: "byok" },
       });
@@ -212,7 +212,7 @@ describe("ProviderRegistry", () => {
   describe("getApiKey()", () => {
     it("returns null when the provider has no stored key", async () => {
       const id = await registry.add({
-        providerType: "anthropic",
+        providerType: "openai-compatible",
         displayName: "Ollama-like",
         origin: { kind: "byok" },
       });
@@ -223,7 +223,7 @@ describe("ProviderRegistry", () => {
   describe("clearApiKey()", () => {
     it("deletes the stored key and clears the keychain pointer", async () => {
       const id = await registry.add({
-        providerType: "anthropic",
+        providerType: "openai-compatible",
         displayName: "A",
         origin: { kind: "byok" },
       });
@@ -237,7 +237,7 @@ describe("ProviderRegistry", () => {
   describe("remove()", () => {
     it("deletes the provider row and its stored key", async () => {
       const id = await registry.add({
-        providerType: "anthropic",
+        providerType: "openai-compatible",
         displayName: "A",
         origin: { kind: "byok" },
       });
@@ -252,14 +252,14 @@ describe("ProviderRegistry", () => {
   describe("list()", () => {
     it("returns stable references while settings are unchanged", async () => {
       await registry.add({
-        providerType: "anthropic",
+        providerType: "openai-compatible",
         displayName: "A",
         origin: { kind: "byok" },
       });
       await registry.add({
-        providerType: "anthropic",
+        providerType: "openai-compatible",
         displayName: "B",
-        origin: { kind: "agent", agentType: "claude" },
+        origin: { kind: "byok", catalogProviderId: "lmstudio" },
       });
       const rows = registry.list();
       expect(registry.list()).toBe(rows);
@@ -270,7 +270,7 @@ describe("ProviderRegistry", () => {
   describe("verify()", () => {
     it("returns the adapter result for the provider's type", async () => {
       const id = await registry.add({
-        providerType: "anthropic",
+        providerType: "openai-compatible",
         displayName: "A",
         origin: { kind: "byok" },
       });
@@ -288,7 +288,7 @@ describe("ProviderRegistry", () => {
       "rejects a missing stored key (%p) without probing a public endpoint (https://github.com/logancyang/obsidian-copilot/issues/3147)",
       async (secret) => {
         const id = await registry.add({
-          providerType: "anthropic",
+          providerType: "openai-compatible",
           displayName: "A",
           origin: { kind: "byok" },
           requiresApiKey: true,
@@ -306,7 +306,7 @@ describe("ProviderRegistry", () => {
 
     it("verifies an optional-auth endpoint without a key but rejects its dangling stored credential (https://github.com/logancyang/obsidian-copilot/issues/3147)", async () => {
       const id = await registry.add({
-        providerType: "anthropic",
+        providerType: "openai-compatible",
         displayName: "Local",
         origin: { kind: "byok" },
         requiresApiKey: false,
@@ -324,7 +324,7 @@ describe("ProviderRegistry", () => {
       const unsubscribe = registry.subscribe(listener);
 
       const id = await registry.add({
-        providerType: "anthropic",
+        providerType: "openai-compatible",
         displayName: "A",
         origin: { kind: "byok" },
       });
@@ -348,7 +348,7 @@ describe("ProviderRegistry", () => {
 
       unsubscribe();
       await registry.add({
-        providerType: "anthropic",
+        providerType: "openai-compatible",
         displayName: "B",
         origin: { kind: "byok" },
       });
@@ -357,7 +357,7 @@ describe("ProviderRegistry", () => {
 
     it("stays silent when a provider is re-registered with the key it already has (https://github.com/Brevilabs/obsidian-copilot-private/issues/472)", async () => {
       const id = await registry.add({
-        providerType: "anthropic",
+        providerType: "openai-compatible",
         displayName: "A",
         origin: { kind: "byok" },
       });
@@ -389,7 +389,7 @@ describe("ProviderRegistry", () => {
 
     it("lets a setApiKey listener read the new key rather than the stale one", async () => {
       const id = await registry.add({
-        providerType: "anthropic",
+        providerType: "openai-compatible",
         displayName: "A",
         origin: { kind: "byok" },
       });
@@ -416,7 +416,7 @@ describe("ProviderRegistry", () => {
       registry.subscribe(bad);
       registry.subscribe(good);
       await registry.add({
-        providerType: "anthropic",
+        providerType: "openai-compatible",
         displayName: "A",
         origin: { kind: "byok" },
       });

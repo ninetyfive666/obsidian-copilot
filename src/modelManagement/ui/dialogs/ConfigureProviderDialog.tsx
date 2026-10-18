@@ -28,13 +28,6 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useModelCandidatePool } from "./useModelCandidatePool";
 import { safeAsyncHandler } from "@/utils/safeAsyncHandler";
 
-const KNOWN_DEFAULT_ENDPOINTS: Record<string, string> = {
-  anthropic: "https://api.anthropic.com",
-  openai: "https://api.openai.com/v1",
-  google: "https://generativelanguage.googleapis.com",
-};
-
-const EMPTY_METADATA: Record<string, ModelInfo> = Object.freeze({});
 const EMPTY_MODELS: readonly ConfiguredModel[] = Object.freeze([]);
 
 export type ConfigureState =
@@ -143,29 +136,6 @@ const ConfigureProviderBody: React.FC<ConfigureProviderBodyProps> = ({
         ? provider.origin.catalogProviderId
         : undefined;
 
-  const [catalogVersion, setCatalogVersion] = useState(0);
-  useEffect(() => {
-    let cancelled = false;
-    const bump = (): void => {
-      if (!cancelled) setCatalogVersion((v) => v + 1);
-    };
-    const unsub = api.catalogService.onChange(bump);
-    api.catalogService
-      .ensureLoaded()
-      .then(bump)
-      .catch((err) => logError("[ConfigureProviderDialog] catalog ensureLoaded failed", err));
-    return () => {
-      cancelled = true;
-      unsub();
-    };
-  }, [api]);
-
-  const catalogMetadata = useMemo<Record<string, ModelInfo>>(() => {
-    if (!catalogProviderId) return EMPTY_METADATA;
-    return api.catalogService.getProvider(catalogProviderId)?.models ?? EMPTY_METADATA;
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- catalogVersion intentionally invalidates metadata read through catalogService
-  }, [catalogProviderId, api, catalogVersion]);
-
   const [displayName, setDisplayName] = useState(() =>
     state.mode === "new" ? state.source.displayName : (provider?.displayName ?? "")
   );
@@ -188,11 +158,7 @@ const ConfigureProviderBody: React.FC<ConfigureProviderBodyProps> = ({
     state.mode === "new" ? state.source.requiresApiKey : providerRequiresApiKey(provider!);
 
   const defaultBaseUrl =
-    state.mode === "new"
-      ? (state.source.defaultBaseUrl ??
-        KNOWN_DEFAULT_ENDPOINTS[state.source.catalogProviderId ?? ""] ??
-        "")
-      : (provider?.baseUrl ?? KNOWN_DEFAULT_ENDPOINTS[catalogProviderId ?? ""] ?? "");
+    state.mode === "new" ? (state.source.defaultBaseUrl ?? "") : (provider?.baseUrl ?? "");
   const effectiveBaseUrl = baseUrl.trim() || defaultBaseUrl;
 
   const pool = useModelCandidatePool({
@@ -201,7 +167,6 @@ const ConfigureProviderBody: React.FC<ConfigureProviderBodyProps> = ({
     providerType,
     effectiveBaseUrl,
     existingModels,
-    catalogMetadata,
     apiKey,
     extras,
     requiresApiKey,

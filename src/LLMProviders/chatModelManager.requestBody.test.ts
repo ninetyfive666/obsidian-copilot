@@ -21,16 +21,6 @@ const OPENAI_RESPONSE = JSON.stringify({
   usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 },
 });
 
-const ANTHROPIC_RESPONSE = JSON.stringify({
-  id: "msg_1",
-  type: "message",
-  role: "assistant",
-  model: "claude-sonnet-4-5",
-  content: [{ type: "text", text: "ok" }],
-  stop_reason: "end_turn",
-  usage: { input_tokens: 1, output_tokens: 1 },
-});
-
 // Providers disagree on accepted sampling values, so Copilot sends none of them.
 // https://github.com/logancyang/obsidian-copilot/issues/2959
 const RETIRED_SAMPLING_PARAMS = ["temperature", "top_p", "frequency_penalty"];
@@ -104,23 +94,6 @@ describe("chatModelManager", () => {
         }
       });
 
-      it("sends Anthropic no sampling parameters either (https://github.com/logancyang/obsidian-copilot/issues/2959)", async () => {
-        const body = captureRequestBody(ANTHROPIC_RESPONSE);
-
-        await send(
-          wireModel({
-            name: "claude-sonnet-4-5",
-            provider: ChatModelProviders.ANTHROPIC,
-            baseUrl: "https://anthropic.invalid",
-            maxTokens: DEFAULT_MAX_OUTPUT_TOKENS,
-          })
-        );
-
-        for (const param of RETIRED_SAMPLING_PARAMS) {
-          expect(body()).not.toHaveProperty(param);
-        }
-      });
-
       it("surfaces a rejected request as the provider's own message rather than a connection failure (https://github.com/logancyang/obsidian-copilot/issues/2959)", async () => {
         respondWithBadRequest("invalid temperature: only 1 is allowed for this model");
 
@@ -158,20 +131,6 @@ describe("chatModelManager", () => {
         expect(body().max_tokens).toBe(8192);
       });
 
-      it("sends Anthropic the ceiling the bridge resolved for the model (https://github.com/logancyang/obsidian-copilot-preview/issues/312)", async () => {
-        const body = captureRequestBody(ANTHROPIC_RESPONSE);
-
-        await send(
-          wireModel({
-            name: "claude-sonnet-4-5",
-            provider: ChatModelProviders.ANTHROPIC,
-            baseUrl: "https://anthropic.invalid",
-            maxTokens: DEFAULT_MAX_OUTPUT_TOKENS,
-          })
-        );
-
-        expect(body().max_tokens).toBe(DEFAULT_MAX_OUTPUT_TOKENS);
-      });
     });
   });
 });

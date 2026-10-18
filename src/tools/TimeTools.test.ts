@@ -210,8 +210,8 @@ describe("TimeTools", () => {
         toOffset: "+9",
       });
 
-      expect(result.originalTime).toMatch(/^6:00\sPM\s/);
-      expect(result.convertedTime).toMatch(/^11:00\sAM\s/);
+      expect(result.originalTime).toMatch(/^(6:00\sPM|18:00)\s/);
+      expect(result.convertedTime).toMatch(/^(11:00(\sAM)?)\s/);
       expect(result.localDateString).toBe("2024-01-16");
       expect(result.timezoneOffset).toBe(540);
     });

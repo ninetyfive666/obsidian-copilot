@@ -15,56 +15,35 @@ describe("ChatModeSelector", () => {
   });
 
   describe("ChatModeSelector()", () => {
-    it("offers Free Chat and paid Copilot Plus without Vault QA https://github.com/Brevilabs/obsidian-copilot-private/issues/286", () => {
+    it("offers plain chat and the Copilot Plus chain https://github.com/Brevilabs/obsidian-copilot-private/issues/286", () => {
       const onModeChange = jest.fn();
       render(
         <ChatModeSelector
           selectedChain={ChainType.LLM_CHAIN}
-          isPaidUser
           onModeChange={onModeChange}
-          onPlusUpsell={jest.fn()}
           defaultOpen
         />
       );
 
-      expect(screen.getAllByText("chat (free)")).toHaveLength(2);
+      expect(screen.getAllByText("chat").length).toBeGreaterThan(0);
       expect(screen.getByText("copilot plus")).toBeTruthy();
-      expect(screen.queryByText(/vault QA/i)).toBeNull();
 
-      fireEvent.click(screen.getByText("copilot plus"));
+      fireEvent.click(screen.getByRole("menuitem", { name: "copilot plus" }));
       expect(onModeChange).toHaveBeenCalledWith(ChainType.COPILOT_PLUS_CHAIN);
     });
 
-    it("switches from Copilot Plus back to Free Chat https://github.com/Brevilabs/obsidian-copilot-private/issues/286", () => {
+    it("switches from the Copilot Plus chain back to plain chat https://github.com/Brevilabs/obsidian-copilot-private/issues/286", () => {
       const onModeChange = jest.fn();
       render(
         <ChatModeSelector
           selectedChain={ChainType.COPILOT_PLUS_CHAIN}
-          isPaidUser
           onModeChange={onModeChange}
-          onPlusUpsell={jest.fn()}
           defaultOpen
         />
       );
 
-      fireEvent.click(screen.getByText("chat (free)"));
+      fireEvent.click(screen.getByRole("menuitem", { name: "chat" }));
       expect(onModeChange).toHaveBeenCalledWith(ChainType.LLM_CHAIN);
-    });
-
-    it("keeps the Copilot Plus upsell for free users https://github.com/Brevilabs/obsidian-copilot-private/issues/286", () => {
-      const onPlusUpsell = jest.fn();
-      render(
-        <ChatModeSelector
-          selectedChain={ChainType.LLM_CHAIN}
-          isPaidUser={false}
-          onModeChange={jest.fn()}
-          onPlusUpsell={onPlusUpsell}
-          defaultOpen
-        />
-      );
-
-      fireEvent.click(screen.getByText("copilot plus"));
-      expect(onPlusUpsell).toHaveBeenCalledTimes(1);
     });
   });
 });

@@ -51,22 +51,19 @@ export const NoEffortControl: StoryObj<Props> = {
   },
 };
 
-export const Unlicensed: StoryObj<Props> = {
+export const UnreachableModel: StoryObj<Props> = {
   args: {
     override: {
       ...ConcreteEffort.args.override,
       models: [
         {
-          name: "copilot-plus-flash",
-          displayName: "Copilot Plus Flash",
-          provider: "copilot-plus",
+          name: "qwen2.5:14b",
+          displayName: "qwen2.5:14b",
+          provider: "ollama",
           enabled: true,
-          _needsLicense: true,
-          _disabledReason: "Copilot license required",
-          _subtitle: "The default model: fastest responses and the most quota.",
+          _disabledReason: "Ollama is not reachable at http://localhost:11434",
         },
         ...ConcreteEffort.args.override.models,
-        { name: "local", displayName: "Local model", provider: "ollama", enabled: true },
       ],
     },
   },
@@ -92,11 +89,11 @@ export const CustomEndpointLabels: StoryObj<Props> = {
           _group: "opencode",
         },
         {
-          name: "copilot-plus/copilot-plus-flash",
-          displayName: "copilot-plus/copilot-plus-flash",
-          provider: "agent",
+          name: "lmstudio/mistral-7b-instruct",
+          displayName: "lmstudio/mistral-7b-instruct",
+          provider: "lmstudio",
           enabled: true,
-          _group: "opencode",
+          _group: "LM Studio",
         },
       ],
       value: "d5df8680-65f4-4c4b-81d2-7797550f47fe/auto|agent",

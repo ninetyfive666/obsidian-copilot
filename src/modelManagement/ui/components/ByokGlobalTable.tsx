@@ -9,7 +9,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
-import { SelfHostCloudWarningIcon } from "@/components/ui/SelfHostCloudWarningIcon";
 import type { ConfiguredModel, Provider } from "@/modelManagement/types/persisted";
 import { useModelManagement } from "@/modelManagement/ui/ModelManagementContext";
 import { providerRequiresApiKey } from "@/modelManagement/providers/providerRequiresApiKey";
@@ -25,7 +24,6 @@ export interface ByokTableGroup {
   provider: Provider;
   models: ConfiguredModel[];
   verification?: VerificationResult;
-  needsSelfHostWarning?: boolean;
 }
 
 interface ByokGlobalTableProps {
@@ -160,7 +158,6 @@ const ProviderCard: React.FC<ProviderCardProps> = ({
                 <span className="tw-truncate tw-text-sm tw-font-semibold tw-text-normal">
                   {provider.displayName}
                 </span>
-                {group.needsSelfHostWarning && <SelfHostCloudWarningIcon />}
               </span>
               <span className="tw-text-xs tw-text-muted">{getSubLine()}</span>
             </div>
@@ -186,7 +183,7 @@ const ProviderCard: React.FC<ProviderCardProps> = ({
                   }}
                 >
                   <Settings2 className="tw-mr-2 tw-size-4" />
-                  Edit key
+                  Edit provider
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   onClick={(e) => {

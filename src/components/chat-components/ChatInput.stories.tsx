@@ -37,11 +37,9 @@ function RestoredComposer() {
       <Button
         disabled={stopped}
         onClick={() => {
-          ref.current?.prependContent(
-            "Summarize the findings.\n\nReview the supporting evidence.",
-            ["claude"],
-            [{ url: "https://example.com/report", title: "Research report" }]
-          );
+          ref.current?.prependContent("Summarize the findings.\n\nReview the supporting evidence.", [
+            { url: "https://example.com/report", title: "Research report" },
+          ]);
           setNotes([note]);
           setImages([screenshot]);
           setStopped(true);
@@ -52,7 +50,6 @@ function RestoredComposer() {
       <ChatInput
         ref={ref}
         app={app}
-        isAgentMode
         inputMessage={input}
         setInputMessage={setInput}
         contextNotes={notes}

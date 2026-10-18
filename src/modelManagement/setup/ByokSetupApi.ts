@@ -5,7 +5,7 @@ import type { BackendConfigRegistry } from "@/modelManagement/backends/BackendCo
 import type { ConfiguredModelRegistry } from "@/modelManagement/models/ConfiguredModelRegistry";
 import type { ProviderRegistry } from "@/modelManagement/providers/ProviderRegistry";
 
-export const BYOK_DEFAULT_AUTO_ENROLL: readonly BackendType[] = ["chat", "opencode"];
+export const BYOK_DEFAULT_AUTO_ENROLL: readonly BackendType[] = ["chat"];
 
 export interface SetupProviderInput {
   catalogProviderId?: string;

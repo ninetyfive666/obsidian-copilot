@@ -61,6 +61,6 @@ export const getModelDisplayText = (model: CustomModel): string => {
 
 export const getModelDisplayWithIcons = (model: CustomModel): string => {
   const displayName = model.displayName || model.name;
-  const provider = `(${getProviderLabel(model.provider, model)})`;
+  const provider = `(${getProviderLabel(model.provider)})`;
   return `${displayName} ${provider}`;
 };

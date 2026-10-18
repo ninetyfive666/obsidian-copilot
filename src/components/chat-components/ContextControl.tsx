@@ -19,8 +19,6 @@ interface ChatControlsProps {
   onAddToContext: (category: string, data: TFile | string | TFolder | WebTabContext | null) => void;
   onRemoveFromContext: (category: string, data: string) => void;
 
-  hideAddContextButton?: boolean;
-  isAgentMode?: boolean;
 }
 
 export const ContextControl: React.FC<ChatControlsProps> = ({
@@ -36,8 +34,6 @@ export const ContextControl: React.FC<ChatControlsProps> = ({
   lexicalEditorRef,
   onAddToContext,
   onRemoveFromContext,
-  hideAddContextButton,
-  isAgentMode,
 }) => {
   const handleRemoveContext = (category: string, data: string) => {
     onRemoveFromContext(category, data);
@@ -64,8 +60,6 @@ export const ContextControl: React.FC<ChatControlsProps> = ({
       selectedTextContexts={selectedTextContexts}
       onTypeaheadSelect={handleTypeaheadSelect}
       lexicalEditorRef={lexicalEditorRef}
-      hideAddContextButton={hideAddContextButton}
-      isAgentMode={isAgentMode}
     />
   );
 };

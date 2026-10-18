@@ -1,5 +1,4 @@
 import { Button } from "@/components/ui/button";
-import { createProductUrl, PRODUCT_URLS } from "@/lib/productLinks";
 import {
   RelevantNotesPane,
   type RelevantNotesPaneProps,
@@ -10,8 +9,8 @@ import React, { useState } from "react";
 
 function NoteRows(): React.ReactNode[] {
   return [
-    { title: "Design principles", score: 0.86, outgoing: true, backlink: false },
-    { title: "Product research", score: 0.72, outgoing: false, backlink: true },
+    { title: "Design principles", score: 0.8, outgoing: true, backlink: true },
+    { title: "Product research", score: 0.5, outgoing: false, backlink: true },
   ].map((note) => (
     <div
       key={note.title}
@@ -32,15 +31,6 @@ function NoteRows(): React.ReactNode[] {
 const baseArgs: RelevantNotesPaneProps = {
   status: "matches",
   noteRows: NoteRows(),
-  actions: {
-    miyoDownloadUrl: createProductUrl(PRODUCT_URLS.MIYO, "relevant_notes"),
-    onOpenMiyoSettings: () => undefined,
-    onRefresh: () => undefined,
-    reviewIndexing: {
-      destination: "miyo",
-      onSelect: () => undefined,
-    },
-  },
 };
 
 const meta = {
@@ -52,22 +42,10 @@ const meta = {
 
 export default meta;
 
-export const ConnectedScoredResults: StoryObj<RelevantNotesPaneProps> = {};
-
-export const SkippedChatAttachments: StoryObj<RelevantNotesPaneProps> = {
-  args: { details: { skippedAttachments: 2 } },
-};
+export const LinkedNotes: StoryObj<RelevantNotesPaneProps> = {};
 
 export const NoUsableChatContext: StoryObj<RelevantNotesPaneProps> = {
-  args: { status: "no-usable-context", details: { skippedAttachments: 2 }, noteRows: [] },
-};
-
-export const ChatContextTooLarge: StoryObj<RelevantNotesPaneProps> = {
-  args: { status: "request-too-large", noteRows: [] },
-};
-
-export const ChatRequestFailure: StoryObj<RelevantNotesPaneProps> = {
-  args: { status: "request-error", noteRows: [] },
+  args: { status: "no-usable-context", noteRows: [] },
 };
 
 export const MatchedFilesUnavailable: StoryObj<RelevantNotesPaneProps> = {
@@ -82,100 +60,13 @@ export const Loading: StoryObj<RelevantNotesPaneProps> = {
   args: { status: "loading", noteRows: [] },
 };
 
-export const NoMiyoEmptyGuidance: StoryObj<RelevantNotesPaneProps> = {
-  args: { status: "disabled", noteRows: [] },
-};
-
-export const MiyoUnavailableEmptyGuidance: StoryObj<RelevantNotesPaneProps> = {
-  args: { status: "unavailable", noteRows: [] },
-};
-
-export const EmptyNoSemanticMatches: StoryObj<RelevantNotesPaneProps> = {
+export const NoLinkedNotes: StoryObj<RelevantNotesPaneProps> = {
   args: { status: "no-matches", noteRows: [] },
-};
-
-export const NotIndexedGuidance: StoryObj<RelevantNotesPaneProps> = {
-  args: { status: "not-indexed", noteRows: [] },
-};
-
-export const NoTextGuidance: StoryObj<RelevantNotesPaneProps> = {
-  args: { status: "no-text", noteRows: [] },
-};
-
-export const IndexingGuidance: StoryObj<RelevantNotesPaneProps> = {
-  args: { status: "indexing", noteRows: [] },
-};
-
-export const IndexErrorGuidance: StoryObj<RelevantNotesPaneProps> = {
-  args: {
-    status: "index-error",
-    details: { errorMessage: "Markdown parser failed" },
-    noteRows: [],
-  },
-};
-
-export const IndexErrorRemoteGuidance: StoryObj<RelevantNotesPaneProps> = {
-  args: {
-    status: "index-error",
-    details: { errorMessage: "Markdown parser failed" },
-    noteRows: [],
-    actions: {
-      ...baseArgs.actions,
-      reviewIndexing: { ...baseArgs.actions.reviewIndexing, destination: "settings" },
-    },
-  },
-};
-
-export const ExcludedGuidance: StoryObj<RelevantNotesPaneProps> = {
-  args: {
-    status: "excluded",
-    details: { exclusionReason: "exclude_pattern", exclusionRule: "**/journal/**" },
-    noteRows: [],
-  },
-};
-
-export const ExcludedRemoteGuidance: StoryObj<RelevantNotesPaneProps> = {
-  args: {
-    status: "excluded",
-    details: { exclusionReason: "exclude_pattern", exclusionRule: "**/journal/**" },
-    noteRows: [],
-    actions: {
-      ...baseArgs.actions,
-      reviewIndexing: { ...baseArgs.actions.reviewIndexing, destination: "settings" },
-    },
-  },
-};
-
-export const NotIndexedRemoteGuidance: StoryObj<RelevantNotesPaneProps> = {
-  args: {
-    status: "not-indexed",
-    noteRows: [],
-    actions: {
-      ...baseArgs.actions,
-      reviewIndexing: { ...baseArgs.actions.reviewIndexing, destination: "settings" },
-    },
-  },
-};
-
-export const VaultNotRegistered: StoryObj<RelevantNotesPaneProps> = {
-  args: { status: "vault-not-registered", details: { folderName: "Work Vault" }, noteRows: [] },
-};
-
-export const VaultNotRegisteredRemote: StoryObj<RelevantNotesPaneProps> = {
-  args: {
-    status: "vault-not-registered",
-    details: { folderName: "Research and long-term project planning" },
-    noteRows: [],
-    actions: {
-      ...baseArgs.actions,
-      reviewIndexing: { ...baseArgs.actions.reviewIndexing, destination: "settings" },
-    },
-  },
 };
 
 export const StateTransitions: StoryObj<RelevantNotesPaneProps> = {
   render: function StateTransitionsStory() {
-    const states = ["loading", "request-error", "no-matches", "matches"] as const;
+    const states = ["loading", "no-matches", "matches"] as const;
     const [index, setIndex] = useState(0);
     const status = states[index];
     return (
@@ -190,7 +81,6 @@ export const StateTransitions: StoryObj<RelevantNotesPaneProps> = {
         </Button>
         <div className="tw-min-h-0 tw-flex-1">
           <RelevantNotesPane
-            {...baseArgs}
             status={status}
             noteRows={status === "matches" ? baseArgs.noteRows : []}
           />

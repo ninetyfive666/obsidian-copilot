@@ -1,6 +1,6 @@
 import type { App } from "obsidian";
 
-import { BUILTIN_CHAT_MODELS, DEFAULT_SETTINGS } from "@/constants";
+import { DEFAULT_SETTINGS } from "@/constants";
 import { KeychainService } from "@/services/keychainService";
 import {
   loadSettingsWithKeychain,
@@ -25,8 +25,7 @@ if (typeof window.structuredClone === "undefined") {
 const noLegacyBackup = async () => ({ status: "not-needed" }) as const;
 
 const VAULT_ID = "a1b2c3d4";
-const BYOK_POINTER = `copilot-v${VAULT_ID}-provider-byok_openai`;
-const PLUS_POINTER = `copilot-v${VAULT_ID}-provider-plus_1`;
+const BYOK_POINTER = `copilot-v${VAULT_ID}-provider-byok_ollama`;
 
 let secrets: Map<string, string>;
 let app: App;
@@ -49,12 +48,12 @@ function makeApp(): App {
 
 function makeProvider(overrides: Partial<Provider>): Provider {
   return {
-    providerId: "byok_openai",
+    providerId: "byok_ollama",
     providerType: "openai-compatible",
-    displayName: "My OpenAI",
+    displayName: "Ollama",
     origin: { kind: "byok" },
     addedAt: 0,
-    requiresApiKey: true,
+    requiresApiKey: false,
     ...overrides,
   };
 }
@@ -69,51 +68,29 @@ describe("model", () => {
       KeychainService.getInstance(app).setVaultId(VAULT_ID);
     });
 
-    it("keeps every credential — top-level, builtin/custom model, BYOK and signed-in Plus provider — reachable through reset, persistence, and a fresh hydration cycle (https://github.com/logancyang/obsidian-copilot-preview/issues/259)", async () => {
-      const builtin = BUILTIN_CHAT_MODELS[0];
-      const builtinRow: CustomModel = {
-        name: builtin.name,
-        provider: builtin.provider,
-        apiKey: "sk-builtin-override",
-        baseUrl: "https://proxy.example.test/v1",
-        enabled: false,
-        displayName: "My renamed model",
-      };
+    it("keeps custom model and BYOK provider credentials reachable through reset, persistence, and a fresh hydration cycle (https://github.com/logancyang/obsidian-copilot-preview/issues/259)", async () => {
       const customRow: CustomModel = {
-        name: "custom-gpt",
-        provider: "openai",
+        name: "llama3.1:8b",
+        provider: "3rd party (openai-format)",
         apiKey: "sk-model-key",
         baseUrl: "http://localhost:9999/v1",
         enabled: true,
       };
       secrets.set(BYOK_POINTER, "sk-provider-key");
-      secrets.set(PLUS_POINTER, "lic-12345");
 
       settingsStore.set(settingsAtom, {
         ...DEFAULT_SETTINGS,
         _keychainVaultId: VAULT_ID,
-        openAIApiKey: "sk-top-level",
-        openAIOrgId: "org-123",
-        isPaidUser: true,
-        plusLicenseKey: "lic-12345",
-        entitlementToken: "test-stale-entitlement-token",
         autoAcceptEdits: true,
-        activeModels: [builtinRow, customRow],
+        activeModels: [customRow],
         providers: {
-          byok_openai: makeProvider({ apiKeyKeychainId: BYOK_POINTER }),
-          plus_1: makeProvider({
-            providerId: "plus_1",
-            displayName: "Copilot",
-            origin: { kind: "copilot-plus" },
-            requiresApiKey: false,
-            apiKeyKeychainId: PLUS_POINTER,
-          }),
+          byok_ollama: makeProvider({ apiKeyKeychainId: BYOK_POINTER }),
         },
         configuredModels: [
           {
             configuredModelId: "cm-1",
-            providerId: "byok_openai",
-            info: { id: "gpt-4", displayName: "GPT-4" },
+            providerId: "byok_ollama",
+            info: { id: "llama3.1:8b", displayName: "Llama 3.1 8B" },
             configuredAt: 0,
           },
         ],
@@ -128,45 +105,24 @@ describe("model", () => {
         savedToDisk = structuredClone(data);
       });
 
-      expect(savedToDisk?.openAIApiKey).toBe("");
-      expect(savedToDisk?.activeModels.find((m) => m.name === "custom-gpt")?.apiKey).toBe("");
+      expect(savedToDisk?.activeModels.find((m) => m.name === "llama3.1:8b")?.apiKey).toBe("");
       expect(savedToDisk?._keychainVaultId).toBe(VAULT_ID);
-      expect(savedToDisk?.providers.byok_openai?.apiKeyKeychainId).toBe(BYOK_POINTER);
+      expect(savedToDisk?.providers.byok_ollama?.apiKeyKeychainId).toBe(BYOK_POINTER);
 
       KeychainService.resetInstance();
       KeychainService.getInstance(app);
-      const reloaded = await loadSettingsWithKeychain(
-        app,
-        savedToDisk,
-        async () => {},
-        noLegacyBackup
-      );
+      const reloaded = await loadSettingsWithKeychain(savedToDisk, async () => {}, noLegacyBackup);
 
       expect(KeychainService.getInstance(app).getVaultId()).toBe(VAULT_ID);
-
-      expect(reloaded.openAIApiKey).toBe("sk-top-level");
-      expect(reloaded.openAIOrgId).toBe("org-123");
       expect(reloaded.autoAcceptEdits).toBe(DEFAULT_SETTINGS.autoAcceptEdits);
 
-      const reloadedBuiltin = reloaded.activeModels.find((m) => m.name === builtin.name);
-      expect(reloadedBuiltin?.apiKey).toBe("sk-builtin-override");
-      expect(reloadedBuiltin?.baseUrl).toBe("https://proxy.example.test/v1");
-      expect(reloadedBuiltin?.enabled).toBe(true);
-      expect(reloadedBuiltin?.displayName).toBeUndefined();
-
-      const reloadedCustom = reloaded.activeModels.find((m) => m.name === "custom-gpt");
+      const reloadedCustom = reloaded.activeModels.find((m) => m.name === "llama3.1:8b");
       expect(reloadedCustom?.apiKey).toBe("sk-model-key");
       expect(reloadedCustom?.baseUrl).toBe("http://localhost:9999/v1");
 
-      expect(reloaded.providers.byok_openai?.apiKeyKeychainId).toBe(BYOK_POINTER);
+      expect(reloaded.providers.byok_ollama?.apiKeyKeychainId).toBe(BYOK_POINTER);
       expect(secrets.get(BYOK_POINTER)).toBe("sk-provider-key");
       expect(reloaded.configuredModels.map((m) => m.configuredModelId)).toEqual(["cm-1"]);
-
-      expect(reloaded.isPaidUser).toBe(true);
-      expect(reloaded.plusLicenseKey).toBe("lic-12345");
-      expect(reloaded.providers.plus_1?.apiKeyKeychainId).toBe(PLUS_POINTER);
-      expect(secrets.get(PLUS_POINTER)).toBe("lic-12345");
-      expect(reloaded.entitlementToken).toBe(DEFAULT_SETTINGS.entitlementToken);
     });
   });
 });

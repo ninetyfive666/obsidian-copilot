@@ -1,15 +1,12 @@
-import { startReleaseUpdateCheck } from "@/services/releaseUpdateNotice";
 import { releaseCursorAssociation } from "@/editor/releaseCursorAssociation";
 import { registerNoteHeaderAction } from "@/editor/registerNoteHeaderAction";
-import type { AgentSessionManager, SkillManager } from "@/agentMode";
-import { isNativeChatId, parseNativeChatId } from "@/utils/nativeChatId";
+import { isNativeChatId } from "@/utils/nativeChatId";
 import {
   buildChatDeepLink,
   buildChatMarkdownLink,
   findChatFileByDeepLinkId,
   getSavedChatDeepLinkId,
 } from "@/utils/chatDeepLink";
-import { BrevilabsClient } from "@/LLMProviders/brevilabsClient";
 import ChainOwner from "@/LLMProviders/chainOwner";
 import { CustomModel, setSelectedTextContexts, getSelectedTextContexts } from "@/aiParams";
 import { NoteSelectedTextContext, SelectedTextContext } from "@/types/message";
@@ -17,7 +14,6 @@ import { registerCommands } from "@/commands";
 import CopilotView from "@/components/CopilotView";
 import RelevantNotesView from "@/components/RelevantNotesView";
 import { APPLY_VIEW_TYPE, ApplyView } from "@/components/composer/ApplyView";
-import { ConfirmModal } from "@/components/modals/ConfirmModal";
 import { LoadChatHistoryModal } from "@/components/modals/LoadChatHistoryModal";
 
 import { registerContextMenu } from "@/commands/contextMenu";
@@ -28,11 +24,7 @@ import { SystemPromptRegister } from "@/system-prompts/systemPromptRegister";
 import { ProjectRegister } from "@/projects/projectRegister";
 import {
   ABORT_REASON,
-  AGENT_CHAT_MODE,
-  CHAT_AGENT_VIEWTYPE,
   CHAT_VIEWTYPE,
-  COPILOT_AGENT_ICON_ID,
-  COPILOT_AGENT_ICON_SVG,
   DEFAULT_OPEN_AREA,
   EVENT_NAMES,
   RELEVANT_NOTES_VIEWTYPE,
@@ -41,12 +33,7 @@ import { ChatManager } from "@/core/ChatManager";
 import { MessageRepository } from "@/core/MessageRepository";
 import { logError, logInfo, logWarn } from "@/logger";
 import { logFileManager } from "@/logFileManager";
-import {
-  createModelManagement,
-  plusSyncNeeded,
-  syncCopilotPlusProvider,
-  type ModelManagementApi,
-} from "@/modelManagement";
+import { createModelManagement, type ModelManagementApi } from "@/modelManagement";
 import { KeychainService } from "@/services/keychainService";
 import { backupLegacyCredentials } from "@/services/legacyCredentialBackup";
 import {
@@ -58,33 +45,18 @@ import {
 import { UserMemoryManager } from "@/memory/UserMemoryManager";
 import { clearRecordedPromptPayload } from "@/LLMProviders/chainRunner/utils/promptPayloadRecorder";
 import {
-  checkIsPaidUser,
-  ENTITLEMENT_REFRESH_INTERVAL_MS,
-  verifyCachedEntitlement,
-} from "@/plusUtils";
-import {
   getWebViewerService,
   startActiveWebTabTracking,
 } from "@/services/webViewerService/webViewerServiceSingleton";
 import { WebSelectionTracker } from "@/services/webViewerService/webViewerServiceSelection";
-import { runSettingsMigrations } from "@/settings/migrations";
-import {
-  cleanupLegacyIndexArtifacts,
-  LEGACY_INDEX_CLEANUP_STORAGE_KEY,
-} from "@/settings/migrations/legacyIndexRemovalMigration";
 import { CopilotSettingTab } from "@/settings/SettingsPage";
 import {
-  type CopilotSettings,
   getModelKeyFromModel,
   getSettings,
   setSettings,
   subscribeToSettingsChange,
-  updateSetting,
 } from "@/settings/model";
 import { ensureCopilotSubfolders, getEffectiveConversationsFolder } from "@/settings/copilotFolder";
-import { buildUpgradeRelocationEntries } from "@/settings/upgradeNotice";
-import { dehydrateDeviceProfile, hydrateDeviceProfile } from "@/settings/deviceProfiles";
-import { getDeviceId } from "@/utils/deviceId";
 import { isDesktopRuntime } from "@/utils/desktopRuntime";
 import { disposeNotificationSound } from "@/utils/notificationSound";
 import { installRendererEventsShim } from "@/utils/rendererEventsShim";
@@ -114,14 +86,6 @@ import {
   ViewCreator,
   WorkspaceLeaf,
 } from "obsidian";
-import {
-  formatStartupMigrationSummary,
-  runStartupMigrationSummary,
-  shouldClearCredentialRecovery,
-  shouldClearFolderRelocation,
-  type StartupMigrationItem,
-  type StartupMigrationTask,
-} from "@/services/startupMigration";
 import { ChatHistoryItem } from "@/components/chat-components/ChatHistoryPopover";
 import {
   extractChatLastAccessedAtMs,
@@ -139,16 +103,9 @@ import {
 } from "@/utils/vaultAdapterUtils";
 import { v4 as uuidv4 } from "uuid";
 import { EditorView } from "@codemirror/view";
-import { OpenArtifactsPublisher } from "@/openArtifacts/OpenArtifactsPublisher";
-import { migrateOpenArtifactsFolder } from "@/openArtifacts/openArtifactsLedger";
-import {
-  createSelfHostWebSearchAgentBridge,
-  type SelfHostWebSearchAgentBridge,
-} from "@/LLMProviders/selfHostServices";
 
 export default class CopilotPlugin extends Plugin {
   chainOwner: ChainOwner;
-  brevilabsClient: BrevilabsClient;
   userMessageHistory: string[] = [];
   fileParserManager: FileParserManager;
   customCommandRegister: CustomCommandRegister;
@@ -156,24 +113,15 @@ export default class CopilotPlugin extends Plugin {
   projectRegister: ProjectRegister;
   settingsUnsubscriber?: () => void;
   chatUIState: ChatManagerChatUIState;
-  agentSessionManager?: AgentSessionManager;
-  skills?: SkillManager;
-  private CopilotAgentView?: typeof import("@/agentMode").CopilotAgentView;
-  private PlanPreviewView?: typeof import("@/agentMode").PlanPreviewView;
-  private planPreviewViewType?: typeof import("@/agentMode").PLAN_PREVIEW_VIEW_TYPE;
-  private agentModelDiscoveryUnsubscriber?: () => void;
   modelManagement!: ModelManagementApi;
-  selfHostWebSearchAgentBridge?: Readonly<SelfHostWebSearchAgentBridge>;
   private ribbonIconEl?: HTMLElement;
   userMemoryManager: UserMemoryManager;
   quickAskController: QuickAskController;
   chatSelectionHighlightController: ChatSelectionHighlightController;
-  private lastActiveChatViewType: typeof CHAT_VIEWTYPE | typeof CHAT_AGENT_VIEWTYPE = CHAT_VIEWTYPE;
   private selectionDebounceTimer?: number;
   private lastSelectionSignature?: string;
   private webSelectionTracker?: WebSelectionTracker;
   private readonly chatHistoryLastAccessedAtManager = new RecentUsageManager<string>();
-  private startupMigrationItems: StartupMigrationItem[] = [];
   private pluginLifecycleActive = true;
 
   public isPluginLifecycleActive(): boolean {
@@ -189,16 +137,6 @@ export default class CopilotPlugin extends Plugin {
     this.modelManagement = createModelManagement({
       app: this.app,
     });
-    // Serialized so a fast sign-out then sign-in settles in issue order, not in whichever
-    // overlapping reconcile finishes last. Nothing awaits it: consumers read the cached snapshot.
-    // https://github.com/Brevilabs/obsidian-copilot-private/issues/319
-    let plusSyncChain: Promise<void> = Promise.resolve();
-    const syncPlus = (isPaidUser: boolean | undefined, licenseKey: string): void => {
-      plusSyncChain = plusSyncChain.then(() =>
-        syncCopilotPlusProvider(this.modelManagement, !!isPaidUser, licenseKey)
-      );
-    };
-    syncPlus(getSettings().isPaidUser, getSettings().plusLicenseKey);
     this.settingsUnsubscriber = subscribeToSettingsChange((prev, next) => {
       void (async () => {
         try {
@@ -207,34 +145,8 @@ export default class CopilotPlugin extends Plugin {
           logError("Failed to persist settings.", error);
           new Notice("Copilot failed to save settings. Check logs and try again.");
         }
-        if (plusSyncNeeded(prev, next)) {
-          syncPlus(next.isPaidUser, next.plusLicenseKey);
-        }
       })();
     });
-    this.register(
-      startReleaseUpdateCheck(
-        this.app,
-        this.manifest.version,
-        getSettings().lastShownStartupVersion,
-        (version) => updateSetting("lastShownStartupVersion", version)
-      )
-    );
-    await runSettingsMigrations(this.modelManagement);
-    void cleanupLegacyIndexArtifacts({
-      adapter: this.app.vault.adapter,
-      configDir: this.app.vault.configDir,
-      hasRun: () => this.app.loadLocalStorage(LEGACY_INDEX_CLEANUP_STORAGE_KEY) === "done",
-      markRun: () => this.app.saveLocalStorage(LEGACY_INDEX_CLEANUP_STORAGE_KEY, "done"),
-      removeRetiredEmbeddingSecrets: () =>
-        KeychainService.getInstance().removeRetiredEmbeddingSecrets(),
-      notifyFailure: (folder) => {
-        new Notice(
-          `Copilot couldn't remove old index files from ${folder}. Remove them manually if you want to reclaim the space.`
-        );
-      },
-    });
-    const isLegacyUpgrade = getSettings().upgradedToV8FromLegacy;
     this.addSettingTab(new CopilotSettingTab(this.app, this));
 
     initializeBuiltinTools(this.app);
@@ -243,65 +155,12 @@ export default class CopilotPlugin extends Plugin {
     CustomCommandManager.getInstance(this.app);
     logFileManager.setApp(this.app);
 
-    this.brevilabsClient = BrevilabsClient.getInstance();
-    this.brevilabsClient.setPluginVersion(this.manifest.version);
-    void verifyCachedEntitlement();
-    if (!isLegacyUpgrade) void checkIsPaidUser(this.app, { trigger: "startup" });
-    this.registerInterval(
-      window.setInterval(
-        () => void checkIsPaidUser(this.app, { trigger: "refresh" }),
-        ENTITLEMENT_REFRESH_INTERVAL_MS
-      )
-    );
-
     this.chainOwner = ChainOwner.getInstance(this.app, this.modelManagement);
-
-    // Must precede Agent Chat: startup model discovery may spawn OpenCode.
-    // https://github.com/Brevilabs/obsidian-copilot-private/issues/165
-    const selfHostWebSearchAgentBridge = createSelfHostWebSearchAgentBridge();
-    this.selfHostWebSearchAgentBridge = selfHostWebSearchAgentBridge;
-    this.register(() => {
-      selfHostWebSearchAgentBridge.dispose();
-      if (this.selfHostWebSearchAgentBridge === selfHostWebSearchAgentBridge) {
-        this.selfHostWebSearchAgentBridge = undefined;
-      }
-    });
-
-    if (isDesktopRuntime()) {
-      const {
-        CopilotAgentView,
-        PlanPreviewView,
-        PLAN_PREVIEW_VIEW_TYPE,
-        acpFrameSink,
-        createAgentSessionManager,
-        setFrameSinkVaultBasePath,
-        SkillManager,
-      } = await import("@/agentMode");
-      const { wireAgentModelDiscovery } = await import("@/agentMode/agentModelDiscovery");
-      this.CopilotAgentView = CopilotAgentView;
-      this.PlanPreviewView = PlanPreviewView;
-      this.planPreviewViewType = PLAN_PREVIEW_VIEW_TYPE;
-
-      const adapter = this.app.vault.adapter;
-      setFrameSinkVaultBasePath(
-        adapter instanceof FileSystemAdapter ? adapter.getBasePath() : null
-      );
-      // A log left permissive by an older build is only reachable here when
-      // frame logging is off. https://github.com/logancyang/obsidian-copilot-preview/issues/250
-      void acpFrameSink.narrowLegacyLogs();
-
-      this.agentSessionManager = createAgentSessionManager(this.app, this);
-      this.skills = SkillManager.getInstance();
-      this.agentModelDiscoveryUnsubscriber = wireAgentModelDiscovery(
-        this,
-        this.agentSessionManager
-      );
-    }
 
     const vaultDataManager = VaultDataManager.getInstance();
     vaultDataManager.initialize(this.app);
 
-    this.fileParserManager = new FileParserManager(this.brevilabsClient, this.app.vault);
+    this.fileParserManager = new FileParserManager(this.app.vault);
 
     const messageRepo = new MessageRepository();
     const chainManager = this.chainOwner.getCurrentChainManager();
@@ -327,8 +186,6 @@ export default class CopilotPlugin extends Plugin {
       this.registerEvent(layoutRef);
     }
 
-    addIcon(COPILOT_AGENT_ICON_ID, COPILOT_AGENT_ICON_SVG);
-
     if (isDesktopRuntime()) registerNoteHeaderAction(this);
 
     this.safeRegisterView(CHAT_VIEWTYPE, (leaf: WorkspaceLeaf) => new CopilotView(leaf, this));
@@ -337,49 +194,16 @@ export default class CopilotPlugin extends Plugin {
       RELEVANT_NOTES_VIEWTYPE,
       (leaf: WorkspaceLeaf) => new RelevantNotesView(leaf, this)
     );
-    if (
-      isDesktopRuntime() &&
-      this.CopilotAgentView &&
-      this.PlanPreviewView &&
-      this.planPreviewViewType
-    ) {
-      const AgentView = this.CopilotAgentView;
-      const PreviewView = this.PlanPreviewView;
-      this.safeRegisterView(
-        CHAT_AGENT_VIEWTYPE,
-        (leaf: WorkspaceLeaf) => new AgentView(leaf, this)
-      );
-      this.safeRegisterView(
-        this.planPreviewViewType,
-        (leaf: WorkspaceLeaf) => new PreviewView(leaf)
-      );
-    }
 
     this.initActiveLeafChangeHandler();
 
-    const agentReady = this.canUseAgentView();
     this.ribbonIconEl = this.addRibbonIcon(
-      agentReady ? COPILOT_AGENT_ICON_ID : "message-square",
-      agentReady ? "Open Copilot Agent Chat" : "Open Copilot Chat",
-      () => (this.canUseAgentView() ? this.activateAgentView() : this.activateView())
+      "message-square",
+      "Open Copilot Chat",
+      () => this.activateView()
     );
 
-    // Awaited so no publish can create .openartifacts before the old folder moves; a
-    // destination that already exists would strand the legacy history for good.
-    // https://github.com/Brevilabs/obsidian-copilot-private/issues/337
-    try {
-      await migrateOpenArtifactsFolder(this.app.vault);
-    } catch (error) {
-      logError("Failed to move the Symposium publishing folder to .openartifacts.", error);
-    }
-    const openArtifactsPublisher = new OpenArtifactsPublisher(this.app);
-    const publishFile = (file: TFile): void => {
-      void openArtifactsPublisher
-        .open(file)
-        .catch((error) => logError("Failed to open OpenArtifacts publishing.", error));
-    };
-    this.register(() => openArtifactsPublisher.dispose());
-    registerCommands(this, publishFile);
+    registerCommands(this);
 
     this.registerEvent(
       this.app.workspace.on("editor-menu", (menu: Menu) => {
@@ -391,10 +215,6 @@ export default class CopilotPlugin extends Plugin {
       this.app.workspace.on("active-leaf-change", (leaf) => {
         this.chatSelectionHighlightController.handleActiveLeafChange(leaf ?? null);
 
-        const activeViewType = leaf?.getViewState().type;
-        if (activeViewType === CHAT_VIEWTYPE || activeViewType === CHAT_AGENT_VIEWTYPE) {
-          this.lastActiveChatViewType = activeViewType;
-        }
       })
     );
 
@@ -403,10 +223,7 @@ export default class CopilotPlugin extends Plugin {
     this.projectRegister = new ProjectRegister(this.app);
 
     this.app.workspace.onLayoutReady(() => {
-      void this.runStartupMigrations(isLegacyUpgrade).catch((error) => {
-        logError("Failed to finish startup migrations", error);
-        new Notice("Copilot could not finish startup migration. Reload Obsidian to retry.");
-      });
+      void this.initializeAuxiliaryRegisters();
     });
 
     this.initSelectionHandler();
@@ -421,125 +238,19 @@ export default class CopilotPlugin extends Plugin {
     });
   }
 
-  private async collectLegacyUpgradeRelocation(): Promise<StartupMigrationItem | null> {
-    if (!getSettings().upgradedToV8FromLegacy) return null;
-
-    const entries = buildUpgradeRelocationEntries(getSettings());
-    if (entries.length > 0) {
-      await ensureCopilotSubfolders(this.app.vault, getSettings());
-    }
-    if (entries.length === 0) {
-      updateSetting("upgradedToV8FromLegacy", false);
-      return null;
-    }
-    return {
-      id: "folders",
-      title: "Copilot folders",
-      status: "action-required",
-      summary: "Copilot now keeps its files under one folder. Existing files were not moved.",
-      details: entries.map(
-        ({ label, oldPath, newPath }) => `${label}: move ${oldPath} to ${newPath}.`
-      ),
-    };
-  }
-
-  private async runStartupMigrations(isLegacyUpgrade: boolean): Promise<void> {
-    const initialSettings = getSettings();
-    const needsLicenseReentry =
-      isLegacyUpgrade && initialSettings.isPaidUser === true && !initialSettings.plusLicenseKey;
-    const task = (
-      result: Promise<StartupMigrationItem | null>,
-      failure: StartupMigrationItem,
-      notice?: string
-    ): StartupMigrationTask => {
-      return {
-        result,
-        failure: isLegacyUpgrade ? failure : null,
-        onFailure: (error) => {
-          logError(`${failure.title} startup migration failed`, error);
-          if (!isLegacyUpgrade && notice) new Notice(notice);
-        },
-      };
-    };
-
-    const projectTask = task(
+  private async initializeAuxiliaryRegisters(): Promise<void> {
+    const results = await Promise.allSettled([
       this.projectRegister.initialize(),
-      {
-        id: "projects",
-        title: "Projects",
-        status: "error",
-        summary: "Projects could not be loaded or migrated. Reload Obsidian to retry.",
-      },
-      "Failed to load projects. Check console for details."
-    );
-    const commandsTask = task(
       this.customCommandRegister.initialize().then(() => migrateCommands(this.app)),
-      {
-        id: "custom-commands",
-        title: "Custom commands",
-        status: "error",
-        summary: "Custom commands could not be loaded or migrated. Reload Obsidian to retry.",
+      this.systemPromptRegister
+        .initialize()
+        .then(() => migrateSystemPromptsFromSettings(this.app)),
+    ]);
+    for (const result of results) {
+      if (result.status === "rejected") {
+        logError("Copilot failed to finish a startup register", result.reason);
       }
-    );
-    const promptsTask = task(
-      this.systemPromptRegister.initialize().then(() => migrateSystemPromptsFromSettings(this.app)),
-      {
-        id: "system-prompt",
-        title: "System prompt",
-        status: "error",
-        summary: "System prompts could not be loaded or migrated. Reload Obsidian to retry.",
-      }
-    );
-    const relocationTask = task(this.collectLegacyUpgradeRelocation(), {
-      id: "folders",
-      title: "Copilot folders",
-      status: "error",
-      summary: "Folder destinations could not be prepared. Reload Obsidian to retry.",
-    });
-    const license: StartupMigrationItem | null = needsLicenseReentry
-      ? {
-          id: "copilot-license",
-          title: "Copilot license",
-          status: "action-required",
-          summary: "Copilot could not restore the previous paid status after the upgrade.",
-          details: ["Re-enter the license key in Copilot Settings to restore paid features."],
-        }
-      : null;
-    if (isLegacyUpgrade) {
-      void checkIsPaidUser(needsLicenseReentry ? undefined : this.app, { trigger: "startup" });
     }
-
-    await runStartupMigrationSummary({
-      initialItems: this.startupMigrationItems,
-      tasks: [projectTask, commandsTask, promptsTask, relocationTask],
-      afterTasks: () => [license],
-      present: (items) => {
-        new ConfirmModal(
-          this.app,
-          () => {},
-          formatStartupMigrationSummary(items),
-          "Copilot upgrade summary",
-          "Done",
-          ""
-        ).open();
-      },
-      acknowledge: (items) => {
-        this.startupMigrationItems = [];
-        const pendingCredentialRecovery = getSettings()._pendingCredentialRecovery;
-        if (
-          shouldClearCredentialRecovery(
-            items,
-            pendingCredentialRecovery?.deviceId,
-            getDeviceId(this.app)
-          )
-        ) {
-          updateSetting("_pendingCredentialRecovery", undefined);
-        }
-        if (shouldClearFolderRelocation(items)) {
-          updateSetting("upgradedToV8FromLegacy", false);
-        }
-      },
-    });
   }
 
   private safeRegisterView(type: string, viewCreator: ViewCreator): void {
@@ -567,9 +278,6 @@ export default class CopilotPlugin extends Plugin {
 
     this.chatSelectionHighlightController?.cleanup();
 
-    this.agentModelDiscoveryUnsubscriber?.();
-    await this.agentSessionManager?.shutdown();
-
     const vaultDataManager = VaultDataManager.getInstance();
     vaultDataManager.cleanup();
 
@@ -577,13 +285,6 @@ export default class CopilotPlugin extends Plugin {
     this.systemPromptRegister?.cleanup();
     this.projectRegister?.cleanup();
     this.settingsUnsubscriber?.();
-
-    if (isDesktopRuntime()) {
-      const { SkillManager } = await import("@/agentMode");
-      if (SkillManager.hasInstance()) {
-        SkillManager.getInstance().dispose();
-      }
-    }
 
     window.clearTimeout(this.selectionDebounceTimer);
     this.cleanupWebSelectionWatcher();
@@ -661,14 +362,11 @@ export default class CopilotPlugin extends Plugin {
     void this.processText(editor, eventType, eventSubtype);
   }
 
-  emitChatIsVisible(viewType: typeof CHAT_VIEWTYPE | typeof CHAT_AGENT_VIEWTYPE = CHAT_VIEWTYPE) {
+  emitChatIsVisible(viewType: string = CHAT_VIEWTYPE) {
     const view = this.app.workspace
       .getLeavesOfType(viewType)
       .map((leaf) => leaf.view)
-      .find(
-        (v): v is CopilotView | InstanceType<NonNullable<typeof this.CopilotAgentView>> =>
-          v instanceof CopilotView || this.isCopilotAgentView(v)
-      );
+      .find((v): v is CopilotView => v instanceof CopilotView);
 
     if (view) {
       view.eventTarget.dispatchEvent(new CustomEvent(EVENT_NAMES.CHAT_IS_VISIBLE));
@@ -682,7 +380,7 @@ export default class CopilotPlugin extends Plugin {
           return;
         }
         const activeViewType = leaf.getViewState().type;
-        if (activeViewType === CHAT_VIEWTYPE || activeViewType === CHAT_AGENT_VIEWTYPE) {
+        if (activeViewType === CHAT_VIEWTYPE) {
           this.emitChatIsVisible(activeViewType);
         }
       })
@@ -891,68 +589,12 @@ export default class CopilotPlugin extends Plugin {
     }, 50);
   }
 
-  private pickContextChatViewType(): typeof CHAT_VIEWTYPE | typeof CHAT_AGENT_VIEWTYPE {
-    const agentUsable = this.canUseAgentView();
-    const agentOpen =
-      agentUsable && this.app.workspace.getLeavesOfType(CHAT_AGENT_VIEWTYPE).length > 0;
-    const legacyOpen = this.app.workspace.getLeavesOfType(CHAT_VIEWTYPE).length > 0;
-
-    let useAgent: boolean;
-    if (agentOpen && legacyOpen) {
-      useAgent = this.lastActiveChatViewType === CHAT_AGENT_VIEWTYPE;
-    } else if (agentOpen || legacyOpen) {
-      useAgent = agentOpen;
-    } else {
-      useAgent = agentUsable;
-    }
-    return useAgent ? CHAT_AGENT_VIEWTYPE : CHAT_VIEWTYPE;
-  }
-
   async activateChatViewForContext(): Promise<void> {
-    if (this.pickContextChatViewType() === CHAT_AGENT_VIEWTYPE) {
-      await this.activateAgentView();
-    } else {
-      await this.activateView();
-    }
+    await this.activateView();
   }
 
   async deactivateView() {
     this.app.workspace.detachLeavesOfType(CHAT_VIEWTYPE);
-  }
-
-  toggleAgentView() {
-    if (!this.requireAgentView()) return;
-    const leaves = this.app.workspace.getLeavesOfType(CHAT_AGENT_VIEWTYPE);
-    if (leaves.length > 0) {
-      void this.deactivateAgentView();
-    } else {
-      void this.activateAgentView();
-    }
-  }
-
-  async activateAgentView(openInRightSidebar = false): Promise<WorkspaceLeaf | null> {
-    if (!this.requireAgentView()) return null;
-    const leaf = await this.openOrRevealView(CHAT_AGENT_VIEWTYPE, openInRightSidebar);
-    const view = leaf?.view;
-    if (this.isCopilotAgentView(view)) {
-      view.eventTarget.queueVisible();
-    }
-    return leaf;
-  }
-
-  async addNoteToAgentChat(note: TFile, openInRightSidebar = false): Promise<void> {
-    try {
-      const leaf = await this.activateAgentView(openInRightSidebar);
-      if (!leaf) return;
-      await this.agentSessionManager?.addContextNoteToActiveChat(note);
-    } catch (error) {
-      logError("Failed to add a note to Agent Chat.", error);
-      new Notice("Could not add the note to Agent Chat. Check Copilot logs.");
-    }
-  }
-
-  async deactivateAgentView() {
-    this.app.workspace.detachLeavesOfType(CHAT_AGENT_VIEWTYPE);
   }
 
   async activateRelevantNotesView(): Promise<WorkspaceLeaf | null> {
@@ -960,11 +602,6 @@ export default class CopilotPlugin extends Plugin {
   }
 
   async addNoteToActiveChat(note: TFile): Promise<void> {
-    // Agent Chat attaches the note as context; Quick Chat keeps the [[wikilink]] (https://github.com/Brevilabs/obsidian-copilot-private/issues/579).
-    if (this.pickContextChatViewType() === CHAT_AGENT_VIEWTYPE) {
-      await this.addNoteToAgentChat(note);
-      return;
-    }
     let leaf = this.app.workspace.getLeavesOfType(CHAT_VIEWTYPE)[0] ?? null;
     if (!leaf) {
       await this.activateView();
@@ -975,30 +612,6 @@ export default class CopilotPlugin extends Plugin {
     this.app.workspace.revealLeaf(leaf);
     if (leaf.view instanceof CopilotView) {
       leaf.view.eventTarget.queueInsertText(`[[${note.basename}]]`);
-    }
-  }
-
-  async newAgentChat(): Promise<void> {
-    const manager = this.requireAgentView();
-    if (!manager) return;
-    await this.activateAgentView();
-    try {
-      await manager.createSession();
-    } catch (error) {
-      logWarn("[CopilotPlugin] Failed to create agent session", error);
-      new Notice("Failed to create agent session. Check Copilot logs.");
-    }
-  }
-
-  async newAgentChatWithDraft(initialDraft: string): Promise<void> {
-    const manager = this.requireAgentView();
-    if (!manager) return;
-    try {
-      await manager.createGlobalSessionWithDraft(initialDraft);
-      await this.activateAgentView();
-    } catch (error) {
-      logWarn("[CopilotPlugin] Failed to create agent session with draft", error);
-      new Notice("Failed to create agent session. Check Copilot logs.");
     }
   }
 
@@ -1023,29 +636,6 @@ export default class CopilotPlugin extends Plugin {
     return leaf;
   }
 
-  private requireAgentView(): AgentSessionManager | null {
-    if (!isDesktopRuntime()) {
-      new Notice("Agent Chat is not available on mobile.");
-      return null;
-    }
-    if (!this.agentSessionManager) {
-      new Notice("Agent Chat is not initialized.");
-      return null;
-    }
-    return this.agentSessionManager;
-  }
-
-  private canUseAgentView(): boolean {
-    return !!this.agentSessionManager && isDesktopRuntime();
-  }
-
-  private isCopilotAgentView(
-    view: unknown
-  ): view is InstanceType<NonNullable<typeof this.CopilotAgentView>> {
-    const AgentView = this.CopilotAgentView;
-    return !!AgentView && view instanceof AgentView;
-  }
-
   async loadSettings() {
     const rawData = (await this.loadData()) as unknown;
     // The keychain bootstrap may persist a sparse snapshot of the raw on-disk
@@ -1056,25 +646,16 @@ export default class CopilotPlugin extends Plugin {
     // and delete this device's `deviceProfiles` segment
     // (https://github.com/logancyang/obsidian-copilot/issues/2539).
     const settings = await loadSettingsWithKeychain(
-      this.app,
       rawData,
-      (d) => super.saveData(d),
+      (d) => this.saveData(d),
       (raw) =>
         backupLegacyCredentials(raw, this.manifest.dir ?? "", {
           exists: (path) => this.app.vault.adapter.exists(path),
           write: (path, contents) => this.app.vault.adapter.write(path, contents),
           rename: (from, to) => this.app.vault.adapter.rename(from, to),
-        }),
-      (item) => this.startupMigrationItems.push(item)
+        })
     );
-    setSettings(hydrateDeviceProfile(settings, getDeviceId(this.app)));
-  }
-
-  // Single choke point for persisted writes; the load-time keychain bootstrap bypasses it via
-  // `super.saveData` (see `loadSettings`).
-  // https://github.com/logancyang/obsidian-copilot/issues/2539
-  async saveData(data: unknown): Promise<void> {
-    return super.saveData(dehydrateDeviceProfile(data as CopilotSettings, getDeviceId(this.app)));
+    setSettings(settings);
   }
 
   mergeActiveModels(
@@ -1198,26 +779,10 @@ export default class CopilotPlugin extends Plugin {
 
   async loadChatById(fileId: string): Promise<void> {
     if (isNativeChatId(fileId)) {
-      await this.loadNativeAgentChat(fileId);
-      return;
+      throw new Error("Chat not found.");
     }
     const file = await resolveFileByPath(this.app, fileId);
     if (!file) throw new Error("Chat file not found.");
-
-    const cachedMode = this.app.metadataCache.getFileCache(file)?.frontmatter?.mode;
-    let mode = typeof cachedMode === "string" ? cachedMode : undefined;
-    if (!mode) {
-      try {
-        const fm = await readFrontmatterViaAdapter(this.app, file.path);
-        if (typeof fm?.mode === "string") mode = fm.mode;
-      } catch (error) {
-        logWarn("Could not read the chat mode from frontmatter", error);
-      }
-    }
-    if (mode === AGENT_CHAT_MODE) {
-      await this.loadAgentChatHistory(file);
-      return;
-    }
     await this.loadChatHistory(file);
   }
 
@@ -1250,35 +815,6 @@ export default class CopilotPlugin extends Plugin {
     } catch (error) {
       logError("Failed to open chat link", error);
       new Notice("Could not open chat link.");
-    }
-  }
-
-  private async loadNativeAgentChat(chatId: string): Promise<void> {
-    const ref = parseNativeChatId(chatId);
-    if (!ref) throw new Error("Chat not found.");
-    const manager = this.requireAgentView();
-    if (!manager) return;
-    const leaf = await this.activateAgentView();
-    if (!leaf) return;
-
-    await manager.loadNativeSessionFromHistory(ref.backendId, ref.sessionId);
-
-    if (this.isCopilotAgentView(leaf.view)) {
-      leaf.view.updateView();
-    }
-  }
-
-  private async loadAgentChatHistory(file: TFile): Promise<void> {
-    const manager = this.requireAgentView();
-    if (!manager) return;
-    const leaf = await this.activateAgentView();
-    if (!leaf) return;
-
-    await manager.loadSessionFromHistory(file);
-    void this.touchChatHistoryLastAccessedAt(file);
-
-    if (this.isCopilotAgentView(leaf.view)) {
-      leaf.view.updateView();
     }
   }
 

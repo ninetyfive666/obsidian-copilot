@@ -8,7 +8,6 @@ import {
   TEXT_READABLE_EXTENSIONS,
 } from "@/constants";
 import { logInfo, logWarn } from "@/logger";
-import { formatUsageCapError } from "@/utils/usageCapError";
 import { BaseChatModel } from "@langchain/core/language_models/chat_models";
 import { MemoryVariables } from "@langchain/core/memory";
 import { DateTime } from "luxon";
@@ -30,8 +29,6 @@ interface APIError extends Error {
 }
 
 const ERROR_MESSAGES = {
-  INVALID_LICENSE_KEY_USER:
-    "Invalid Copilot Plus license key. Please check your license key in settings.",
   UNKNOWN_ERROR: "An unknown error occurred",
   REQUEST_FAILED: (status: number) => `Request failed, status ${status}`,
 } as const;
@@ -52,26 +49,7 @@ function extractErrorDetail(error: unknown): ErrorDetail {
   };
 }
 
-function isLicenseKeyError(error: unknown): boolean {
-  const errorDetail = extractErrorDetail(error);
-  const err = error as Record<string, unknown> | null | undefined;
-  const message = err?.message as string | undefined;
-  return Boolean(
-    errorDetail.reason === "Invalid license key" ||
-    message === "Invalid license key" ||
-    message?.includes("status 403") ||
-    errorDetail.status === 403
-  );
-}
-
 export function getApiErrorMessage(error: unknown): string {
-  if (isLicenseKeyError(error)) {
-    return ERROR_MESSAGES.INVALID_LICENSE_KEY_USER;
-  }
-  const capMessage = formatUsageCapError(error);
-  if (capMessage) {
-    return capMessage;
-  }
   const errorDetail = extractErrorDetail(error);
   return (
     errorDetail.message ||
@@ -504,9 +482,7 @@ export async function safeFetch(
     error.json = errorJson;
 
     const detail = errorJson && typeof errorJson.detail === "object" ? errorJson.detail : undefined;
-    if (detail?.reason === "Invalid license key" || errorJson?.reason === "Invalid license key") {
-      error.message = "Invalid license key";
-    } else if (detail?.message || errorJson?.message) {
+    if (detail?.message || errorJson?.message) {
       const message = detail?.message || errorJson?.message;
       const reason = detail?.reason || errorJson?.reason;
       error.message = reason ? `${message}: ${reason}` : (message ?? "");

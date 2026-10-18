@@ -1,31 +1,25 @@
 import type { App } from "obsidian";
 
 import { BackendConfigRegistry } from "@/modelManagement/backends/BackendConfigRegistry";
-import { CatalogDownloadService } from "@/modelManagement/catalog/CatalogDownloadService";
 import { ConfiguredModelRegistry } from "@/modelManagement/models/ConfiguredModelRegistry";
 import {
   createDefaultAdapterRegistry,
   ProviderAdapterRegistry,
 } from "@/modelManagement/providers/adapters/ProviderAdapterRegistry";
 import { ProviderRegistry } from "@/modelManagement/providers/ProviderRegistry";
-import { AgentSetupApi } from "@/modelManagement/setup/AgentSetupApi";
 import { ByokSetupApi } from "@/modelManagement/setup/ByokSetupApi";
-import { CopilotPlusSetupApi } from "@/modelManagement/setup/CopilotPlusSetupApi";
 
 export interface CreateModelManagementInput {
   app: App;
 }
 
 export interface ModelManagementApi {
-  catalogService: CatalogDownloadService;
   providerRegistry: ProviderRegistry;
   configuredModelRegistry: ConfiguredModelRegistry;
   backendConfigRegistry: BackendConfigRegistry;
   adapters: ProviderAdapterRegistry;
   setup: {
     byok: ByokSetupApi;
-    agent: AgentSetupApi;
-    copilotPlus: CopilotPlusSetupApi;
   };
   coordinator: ModelManagementCoordinator;
   dispose(): void;
@@ -66,7 +60,6 @@ export function createModelManagement(input: CreateModelManagementInput): ModelM
 
   const adapters = createDefaultAdapterRegistry();
 
-  const catalogService = new CatalogDownloadService({ app });
   const providerRegistry = new ProviderRegistry(app, adapters);
   const configuredModelRegistry = new ConfiguredModelRegistry();
   const backendConfigRegistry = new BackendConfigRegistry(
@@ -80,23 +73,9 @@ export function createModelManagement(input: CreateModelManagementInput): ModelM
   );
   const setup = {
     byok: new ByokSetupApi(providerRegistry, configuredModelRegistry, backendConfigRegistry),
-    agent: new AgentSetupApi(
-      providerRegistry,
-      configuredModelRegistry,
-      backendConfigRegistry,
-      catalogService,
-      coordinator
-    ),
-    copilotPlus: new CopilotPlusSetupApi(
-      providerRegistry,
-      configuredModelRegistry,
-      backendConfigRegistry,
-      coordinator
-    ),
   };
 
   return {
-    catalogService,
     providerRegistry,
     configuredModelRegistry,
     backendConfigRegistry,

@@ -1,10 +1,8 @@
 export type { ModelInfo, ProviderType } from "./types/catalog";
 export type {
-  AgentType,
   BackendConfig,
   BackendType,
   ConfiguredModel,
-  PersistedCopilotPlusCatalog,
   Provider,
   ProviderOrigin,
 } from "./types/persisted";
@@ -12,7 +10,6 @@ export type { EnabledBackendEntry } from "./types/runtime";
 
 export { ProviderRegistry } from "./providers/ProviderRegistry";
 export { isSelfHostedProvider } from "./providers/isSelfHostedProvider";
-export { providerNeedsSelfHostWarning } from "./providers/selfHostPolicy";
 export {
   providerNeedsResolvedApiKey,
   providerRequiresApiKey,
@@ -28,8 +25,6 @@ export { capabilitiesFromConfiguredInfo } from "./chatModel/modelCapabilityFlags
 
 export type { SetupProviderInput } from "./setup/ByokSetupApi";
 
-export { plusSyncNeeded, syncCopilotPlusProvider } from "./setup/copilotPlusSync";
-
 export { createModelManagement } from "./createModelManagement";
 export type { ModelManagementApi } from "./createModelManagement";
 
@@ -37,7 +32,6 @@ export {
   chatBackendPickerAtom,
   backendsAtom,
   configuredModelsAtom,
-  copilotPlusCatalogAtom,
   providersAtom,
 } from "./state/atoms";
 

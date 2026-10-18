@@ -1,10 +1,9 @@
-import { getSettings, resetSettings, updateSetting } from "@/settings/model";
+import { getSettings, resetSettings } from "@/settings/model";
 
 import { ConfiguredModelRegistry } from "@/modelManagement/models/ConfiguredModelRegistry";
 import { ProviderRegistry } from "@/modelManagement/providers/ProviderRegistry";
 import { ProviderAdapterRegistry } from "@/modelManagement/providers/adapters/ProviderAdapterRegistry";
 import type { BackendType } from "@/modelManagement/types/persisted";
-import type { EnabledBackendEntry } from "@/modelManagement/types/runtime";
 
 import { BackendConfigRegistry } from "./BackendConfigRegistry";
 
@@ -17,7 +16,6 @@ jest.mock("@/logger", () => ({
 }));
 
 const CHAT: BackendType = "chat";
-const OPENCODE: BackendType = "opencode";
 
 describe("BackendConfigRegistry", () => {
   let registry: BackendConfigRegistry;
@@ -92,14 +90,12 @@ describe("BackendConfigRegistry", () => {
   });
 
   describe("removeRefs()", () => {
-    it("removes the given model ids from every backend", async () => {
+    it("removes the given model ids from the chat backend", async () => {
       await registry.setEnabledModels(CHAT, ["m1", "m2", "m3"]);
-      await registry.setEnabledModels(OPENCODE, ["m2", "m4"]);
 
       await registry.removeRefs(["m2", "m3"]);
 
       expect(registry.get(CHAT).enabledModels).toEqual(["m1"]);
-      expect(registry.get(OPENCODE).enabledModels).toEqual(["m4"]);
     });
 
     it("leaves settings untouched when given no ids", async () => {
@@ -138,7 +134,7 @@ describe("BackendConfigRegistry", () => {
       expect(listener).toHaveBeenCalledTimes(4);
 
       unsubscribe();
-      await registry.enableModel(OPENCODE, "x");
+      await registry.enableModel(CHAT, "m3");
       expect(listener).toHaveBeenCalledTimes(4);
     });
   });
@@ -146,7 +142,7 @@ describe("BackendConfigRegistry", () => {
   describe("resolveEnabled()", () => {
     it("marks entries whose configured model exists as ok and the rest as broken", async () => {
       const providerId = await providers.add({
-        providerType: "anthropic",
+        providerType: "openai-compatible",
         displayName: "Anthropic",
         origin: { kind: "byok" },
       });
@@ -164,7 +160,6 @@ describe("BackendConfigRegistry", () => {
 
     it("returns the same frozen empty list when no models are enabled", async () => {
       await registry.setEnabledModels(CHAT, []);
-      updateSetting("enableSelfHostMode", true);
 
       const a = registry.resolveEnabled(CHAT);
       const b = registry.resolveEnabled(CHAT);
@@ -172,72 +167,38 @@ describe("BackendConfigRegistry", () => {
       expect(a).toBe(b);
     });
 
-    describe("Self-Host Mode marking", () => {
-      async function seedMixedBackend(backend: BackendType): Promise<{
-        cloudId: string;
-        localId: string;
-      }> {
-        const cloudProviderId = await providers.add({
-          providerType: "anthropic",
-          displayName: "Anthropic Cloud",
-          baseUrl: "https://api.anthropic.com",
-          origin: { kind: "byok" },
-        });
-        const localProviderId = await providers.add({
-          providerType: "openai-compatible",
-          displayName: "Local Ollama",
-          baseUrl: "http://localhost:11434/v1",
-          origin: { kind: "byok" },
-        });
-        const cloudId = await models.add({
-          providerId: cloudProviderId,
-          info: { id: "claude-sonnet-4-5", displayName: "Claude" },
-        });
-        const localId = await models.add({
-          providerId: localProviderId,
-          info: { id: "llama3", displayName: "Llama 3" },
-        });
-        await registry.setEnabledModels(backend, [cloudId, localId, "missing-id"]);
-        return { cloudId, localId };
+    it("keeps every enabled entry in order with provider and model attached", async () => {
+      const ollamaId = await providers.add({
+        providerType: "openai-compatible",
+        displayName: "Ollama",
+        origin: { kind: "byok" },
+        baseUrl: "http://localhost:11434/v1",
+      });
+      const lmstudioId = await providers.add({
+        providerType: "openai-compatible",
+        displayName: "LM Studio",
+        origin: { kind: "byok" },
+        baseUrl: "http://localhost:1234/v1",
+      });
+      const llamaId = await models.add({
+        providerId: ollamaId,
+        info: { id: "llama3", displayName: "Llama 3" },
+      });
+      const mistralId = await models.add({
+        providerId: lmstudioId,
+        info: { id: "mistral-7b", displayName: "Mistral 7B" },
+      });
+      await registry.setEnabledModels(CHAT, [llamaId, mistralId, "missing-id"]);
+
+      const resolved = registry.resolveEnabled(CHAT);
+      expect(resolved.map((e) => e.configuredModelId)).toEqual([llamaId, mistralId, "missing-id"]);
+      expect(resolved[0].state).toBe("ok");
+      if (resolved[0].state === "ok") {
+        expect(resolved[0].provider.providerId).toBe(ollamaId);
+        expect(resolved[0].configuredModel.configuredModelId).toBe(llamaId);
       }
-
-      function warnings(resolved: readonly EnabledBackendEntry[]): Record<string, boolean> {
-        const out: Record<string, boolean> = {};
-        for (const e of resolved) {
-          if (e.state === "ok") out[e.configuredModelId] = Boolean(e.needsSelfHostWarning);
-        }
-        return out;
-      }
-
-      it("keeps everything unflagged when Self-Host Mode is off", async () => {
-        const { cloudId, localId } = await seedMixedBackend(CHAT);
-        const resolved = registry.resolveEnabled(CHAT);
-        expect(resolved.map((e) => e.configuredModelId)).toEqual([cloudId, localId, "missing-id"]);
-        expect(warnings(resolved)).toEqual({ [cloudId]: false, [localId]: false });
-      });
-
-      it("keeps every entry in order, flags cloud BYOK only when on", async () => {
-        const { cloudId, localId } = await seedMixedBackend(CHAT);
-        updateSetting("enableSelfHostMode", true);
-
-        const resolved = registry.resolveEnabled(CHAT);
-        expect(resolved.map((e) => e.configuredModelId)).toEqual([cloudId, localId, "missing-id"]);
-        expect(warnings(resolved)).toEqual({ [cloudId]: true, [localId]: false });
-      });
-
-      it("clears the flags when Self-Host Mode is turned back off (no writeback)", async () => {
-        const { cloudId, localId } = await seedMixedBackend(CHAT);
-
-        updateSetting("enableSelfHostMode", true);
-        expect(warnings(registry.resolveEnabled(CHAT))[cloudId]).toBe(true);
-
-        expect(registry.get(CHAT).enabledModels).toEqual([cloudId, localId, "missing-id"]);
-
-        updateSetting("enableSelfHostMode", false);
-        const resolved = registry.resolveEnabled(CHAT);
-        expect(resolved.map((e) => e.configuredModelId)).toEqual([cloudId, localId, "missing-id"]);
-        expect(warnings(resolved)[cloudId]).toBe(false);
-      });
+      expect(resolved[1].state).toBe("ok");
+      expect(resolved[2].state).toBe("broken");
     });
   });
 });

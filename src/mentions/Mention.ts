@@ -1,15 +1,6 @@
 import { ImageProcessor } from "@/imageProcessing/imageProcessor";
-import {
-  BrevilabsClient,
-  Twitter4llmResponse,
-  Url4llmResponse,
-} from "@/LLMProviders/brevilabsClient";
 import { Vault } from "obsidian";
-import { selfHostYoutube4llm } from "@/LLMProviders/selfHostServices";
-import { err2String, isTwitterUrl, isYoutubeUrl } from "@/utils";
-import { logError } from "@/logger";
-import { isSelfHostModeValid } from "@/plusUtils";
-import { getSettings } from "@/settings/model";
+import { isTwitterUrl, isYoutubeUrl } from "@/utils";
 
 export interface MentionData {
   type: string;
@@ -18,14 +9,19 @@ export interface MentionData {
   error?: string;
 }
 
+const UNSUPPORTED_URL_ERROR =
+  "URL content cannot be fetched: this build only works with local content.";
+const UNSUPPORTED_YOUTUBE_ERROR =
+  "YouTube transcripts cannot be fetched: this build only works with local content.";
+const UNSUPPORTED_TWITTER_ERROR =
+  "Twitter content cannot be fetched: this build only works with local content.";
+
 export class Mention {
   private static instance: Mention;
   private mentions: Map<string, MentionData>;
-  private brevilabsClient: BrevilabsClient;
 
   private constructor() {
     this.mentions = new Map();
-    this.brevilabsClient = BrevilabsClient.getInstance();
   }
 
   static getInstance(): Mention {
@@ -35,38 +31,20 @@ export class Mention {
     return Mention.instance;
   }
 
-  async processUrl(url: string): Promise<Url4llmResponse & { error?: string }> {
-    try {
-      return await this.brevilabsClient.url4llm(url);
-    } catch (error) {
-      const msg = err2String(error);
-      logError(`Error processing URL ${url}: ${msg}`);
-      return { response: url, elapsed_time_ms: 0, error: msg };
-    }
+  async processUrl(url: string): Promise<{ response: string; elapsed_time_ms: number; error?: string }> {
+    return { response: url, elapsed_time_ms: 0, error: UNSUPPORTED_URL_ERROR };
   }
 
   async processYoutubeUrl(url: string): Promise<{ transcript: string; error?: string }> {
-    try {
-      const response =
-        isSelfHostModeValid() && getSettings().supadataApiKey
-          ? await selfHostYoutube4llm(url)
-          : await this.brevilabsClient.youtube4llm(url);
-      return { transcript: response.response.transcript };
-    } catch (error) {
-      const msg = err2String(error);
-      logError(`Error processing YouTube URL ${url}: ${msg}`);
-      return { transcript: "", error: msg };
-    }
+    return { transcript: "", error: UNSUPPORTED_YOUTUBE_ERROR };
   }
 
-  async processTwitterUrl(url: string): Promise<Twitter4llmResponse & { error?: string }> {
-    try {
-      return await this.brevilabsClient.twitter4llm(url);
-    } catch (error) {
-      const msg = err2String(error);
-      logError(`Error processing Twitter URL ${url}: ${msg}`);
-      return { response: url, elapsed_time_ms: 0, error: msg };
-    }
+  async processTwitterUrl(url: string): Promise<{
+    response: string;
+    elapsed_time_ms: number;
+    error?: string;
+  }> {
+    return { response: url, elapsed_time_ms: 0, error: UNSUPPORTED_TWITTER_ERROR };
   }
 
   async processUrlList(
@@ -85,77 +63,37 @@ export class Mention {
       return { urlContext, imageUrls, processedErrorUrls };
     }
 
-    const processPromises = urls.map(async (url) => {
+    for (const url of urls) {
       if (await ImageProcessor.isImageUrl(url, vault)) {
         imageUrls.push(url);
-        return { type: "image", url };
+        continue;
       }
 
-      if (isYoutubeUrl(url)) {
-        const cached = this.mentions.get(url);
-        if (!cached || cached.error) {
-          const processed = await this.processYoutubeUrl(url);
-          this.mentions.set(url, {
+      const data: MentionData = isYoutubeUrl(url)
+        ? {
             type: "youtube",
             original: url,
-            processed: processed.transcript,
-            error: processed.error,
-          });
-        }
-        return { type: "youtube", data: this.mentions.get(url) };
+            processed: "",
+            error: UNSUPPORTED_YOUTUBE_ERROR,
+          }
+        : isTwitterUrl(url)
+          ? {
+              type: "twitter",
+              original: url,
+              processed: url,
+              error: UNSUPPORTED_TWITTER_ERROR,
+            }
+          : {
+              type: "url",
+              original: url,
+              processed: url,
+              error: UNSUPPORTED_URL_ERROR,
+            };
+
+      if (data.error) {
+        processedErrorUrls[data.original] = data.error;
       }
-
-      if (isTwitterUrl(url)) {
-        const cached = this.mentions.get(url);
-        if (!cached || cached.error) {
-          const processed = await this.processTwitterUrl(url);
-          this.mentions.set(url, {
-            type: "twitter",
-            original: url,
-            processed: processed.response,
-            error: processed.error,
-          });
-        }
-        return { type: "twitter", data: this.mentions.get(url) };
-      }
-
-      const cachedUrl = this.mentions.get(url);
-      if (!cachedUrl || cachedUrl.error) {
-        const processed = await this.processUrl(url);
-        this.mentions.set(url, {
-          type: "url",
-          original: url,
-          processed: processed.response,
-          error: processed.error,
-        });
-      }
-      return { type: "url", data: this.mentions.get(url) };
-    });
-
-    const processedUrls = await Promise.all(processPromises);
-
-    processedUrls.forEach((result) => {
-      if (result.type === "image") {
-        return;
-      }
-
-      const urlData = result.data;
-      if (!urlData) return;
-
-      if (urlData.processed) {
-        if (result.type === "youtube") {
-          urlContext += `\n\n<youtube_video_context>\n<url>${urlData.original}</url>\n<content>\n${urlData.processed}\n</content>\n</youtube_video_context>`;
-        } else if (result.type === "twitter") {
-          urlContext += `\n\n<twitter_content>\n<url>${urlData.original}</url>\n<content>\n${urlData.processed}\n</content>\n</twitter_content>`;
-        } else {
-          urlContext += `\n\n<url_content>\n<url>${urlData.original}</url>\n<content>\n${urlData.processed}\n</content>\n</url_content>`;
-        }
-      }
-
-      if (urlData.error) {
-        processedErrorUrls[urlData.original] = urlData.error;
-      }
-    });
+    }
 
     return { urlContext, imageUrls, processedErrorUrls };
   }

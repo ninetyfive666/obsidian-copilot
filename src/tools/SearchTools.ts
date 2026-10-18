@@ -1,16 +1,11 @@
-import { getStandaloneQuestion } from "@/chainUtils";
 import { TEXT_WEIGHT } from "@/constants";
-import { BrevilabsClient } from "@/LLMProviders/brevilabsClient";
-import { hasSelfHostSearchKey, selfHostWebSearch } from "@/LLMProviders/selfHostServices";
-import { logError, logInfo } from "@/logger";
-import { isSelfHostModeValid } from "@/plusUtils";
+import { logInfo } from "@/logger";
 import { RetrieverFactory } from "@/search/RetrieverFactory";
 import { getSettings } from "@/settings/model";
 import { App } from "obsidian";
 import * as z from "zod";
 import { deduplicateSources } from "@/LLMProviders/chainRunner/utils/toolExecution";
 import { createLangChainTool } from "./createLangChainTool";
-import { getWebSearchCitationInstructions } from "@/LLMProviders/chainRunner/utils/citationUtils";
 import { TieredLexicalRetriever } from "@/search/v3/TieredLexicalRetriever";
 import { FilterRetriever } from "@/search/v3/FilterRetriever";
 import { RETURN_ALL_LIMIT } from "@/search/v3/SearchCore";
@@ -255,57 +250,6 @@ function validateTimeRange(timeRange?: {
   return { startTime, endTime };
 }
 
-async function performMiyoSearch({
-  app,
-  query,
-  salientTerms,
-  timeRange,
-}: {
-  app: App;
-  query: string;
-  salientTerms: string[];
-  timeRange?: { startTime: number; endTime: number };
-}) {
-  const tagTerms = salientTerms.filter((term) => term.startsWith("#"));
-  const needsExpandedLimits = timeRange !== undefined || tagTerms.length > 0;
-  const effectiveMaxK = needsExpandedLimits ? RETURN_ALL_LIMIT : getSettings().maxSourceChunks;
-
-  const filterRetriever = new FilterRetriever(app, {
-    salientTerms,
-    timeRange,
-    maxK: effectiveMaxK,
-    returnAll: needsExpandedLimits,
-  });
-  const filterDocs = await filterRetriever.getRelevantDocuments(query);
-
-  let miyoDocs: import("@langchain/core/documents").Document[] = [];
-  if (!filterRetriever.hasTimeRange()) {
-    const miyoRetriever = RetrieverFactory.createMiyoRetriever(app, {
-      minSimilarityScore: needsExpandedLimits ? 0.0 : 0.1,
-      maxK: effectiveMaxK,
-      salientTerms,
-      textWeight: TEXT_WEIGHT,
-      returnAll: needsExpandedLimits,
-      useRerankerThreshold: 0.5,
-      tagTerms,
-    });
-    miyoDocs = await miyoRetriever.getRelevantDocuments(query);
-  }
-
-  logInfo(
-    `miyoSearch: ${filterDocs.length} filter + ${miyoDocs.length} miyo docs for query: "${query}"`
-  );
-
-  const { filterResults, searchResults } = mergeFilterAndSearchResults(filterDocs, miyoDocs);
-
-  const allDocs = [
-    ...filterResults.map((doc) => projectSearchDocument(doc, true)),
-    ...searchResults.map((doc) => projectSearchDocument(doc, false)),
-  ].slice(0, effectiveMaxK);
-
-  return { type: "local_search", documents: allDocs };
-}
-
 const createLocalSearchTool = (app: App) =>
   createLangChainTool({
     name: "localSearch",
@@ -314,28 +258,6 @@ const createLocalSearchTool = (app: App) =>
     schema: localSearchSchema,
     func: async ({ timeRange: rawTimeRange, query, salientTerms, _preExpandedQuery }) => {
       const timeRange = validateTimeRange(rawTimeRange);
-      const settings = getSettings();
-      const miyoActive = RetrieverFactory.isMiyoActive();
-
-      // Miyo can stay enabled on mobile even though local discovery is unavailable.
-      // Preserve that user intent as an unavailable result instead of silently
-      // routing the same request to keyword search.
-      // https://github.com/Brevilabs/obsidian-copilot-private/issues/356
-      if (settings.enableMiyo && !miyoActive) {
-        throw new Error(
-          "Miyo is unavailable. Configure a remote Miyo connection, then retry vault search."
-        );
-      }
-
-      if (miyoActive) {
-        logInfo("localSearch: Using Miyo search path");
-        return await performMiyoSearch({
-          app,
-          query,
-          salientTerms,
-          timeRange,
-        });
-      }
 
       const tagTerms = salientTerms.filter((term) => term.startsWith("#"));
       const shouldForceLexical = timeRange !== undefined || tagTerms.length > 0;
@@ -365,55 +287,4 @@ const createLocalSearchTool = (app: App) =>
     },
   });
 
-const webSearchSchema = z.object({
-  query: z.string().min(1).describe("The search query to search the internet"),
-  chatHistory: z
-    .array(
-      z.object({
-        role: z.enum(["user", "assistant"]),
-        content: z.string(),
-      })
-    )
-    .describe("Previous conversation turns for context (usually empty array)"),
-});
-
-const webSearchTool = createLangChainTool({
-  name: "webSearch",
-  description:
-    "Search the INTERNET (NOT vault notes) when user explicitly asks for web/online information",
-  schema: webSearchSchema,
-  func: async ({ query, chatHistory }) => {
-    try {
-      const standaloneQuestion = await getStandaloneQuestion(query, chatHistory);
-
-      let webContent: string;
-      let citations: string[];
-
-      if (isSelfHostModeValid() && hasSelfHostSearchKey()) {
-        const result = await selfHostWebSearch(standaloneQuestion);
-        webContent = result.content;
-        citations = result.citations;
-      } else {
-        const response = await BrevilabsClient.getInstance().webSearch(standaloneQuestion);
-        webContent = response.response.choices[0].message.content;
-        citations = response.response.citations || [];
-      }
-
-      const formattedResults = [
-        {
-          type: "web_search",
-          content: webContent,
-          citations: citations,
-          instruction: getWebSearchCitationInstructions(),
-        },
-      ];
-
-      return formattedResults;
-    } catch (error) {
-      logError(`Error processing web search query ${query}:`, error);
-      return { error: `Web search failed: ${error}` };
-    }
-  },
-});
-
-export { createLocalSearchTool, webSearchTool };
+export { createLocalSearchTool };

@@ -1,16 +1,11 @@
 import type { ModelInfo, ProviderType } from "./catalog";
 
-export type AgentType = "opencode" | "claude" | "codex";
+export type BackendType = "chat";
 
-export type BackendType = AgentType | "chat";
-
-export type ProviderOrigin =
-  | {
-      kind: "byok";
-      catalogProviderId?: string;
-    }
-  | { kind: "agent"; agentType: AgentType }
-  | { kind: "copilot-plus" };
+export type ProviderOrigin = {
+  kind: "byok";
+  catalogProviderId?: string;
+};
 
 export interface Provider {
   providerId: string;
@@ -36,7 +31,3 @@ export interface BackendConfig {
   enabledModels: string[];
 }
 
-export interface PersistedCopilotPlusCatalog {
-  models: ModelInfo[];
-  defaultEnabledIds: string[];
-}

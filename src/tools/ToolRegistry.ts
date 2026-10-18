@@ -11,7 +11,6 @@ export interface ToolMetadata {
   copilotCommands?: string[];
   timeoutMs?: number;
   isBackground?: boolean;
-  isPlusOnly?: boolean;
   requiresUserMessageContent?: boolean;
 }
 

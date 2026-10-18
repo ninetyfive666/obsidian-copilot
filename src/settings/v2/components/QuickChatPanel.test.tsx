@@ -3,9 +3,6 @@ import { updateSetting } from "@/settings/model";
 import { fireEvent, render, screen } from "@testing-library/react";
 import React from "react";
 
-jest.mock("@/agentMode", () => {
-  throw new Error("Quick Chat settings must not initialize desktop agents");
-});
 jest.mock("@/settings/model", () => ({
   // eslint-disable-next-line @eslint-react/hooks-extra/no-unnecessary-use-prefix -- mocks the public hook
   useSettingsValue: () => ({ defaultModelKey: "legacy-default" }),

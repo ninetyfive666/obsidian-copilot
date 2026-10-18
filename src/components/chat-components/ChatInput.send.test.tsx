@@ -11,11 +11,10 @@ import {
   $createTextNode,
   type LexicalEditor,
 } from "lexical";
-import { AgentPillNode, $createAgentPillNode, $isAgentPillNode } from "./pills/AgentPillNode";
 let mockEditor: LexicalEditor;
 
 jest.mock("@/aiParams", () => ({
-  useChainType: jest.fn().mockReturnValue(["agent"]),
+  useChainType: jest.fn().mockReturnValue(["llm-chain"]),
   useModelKey: jest.fn().mockReturnValue(["model", jest.fn()]),
 }));
 jest.mock("@/settings/model", () => ({
@@ -40,19 +39,13 @@ jest.mock("@/components/chat-components/LexicalEditor", () => ({
     React.useEffect(() => {
       mockEditor = createEditor({
         namespace: "restore-test",
-        nodes: [AgentPillNode],
         onError: (error) => {
           throw error;
         },
       });
       mockEditor.update(
         () => {
-          $getRoot().append(
-            $createParagraphNode().append(
-              $createAgentPillNode("codex", "Codex"),
-              $createTextNode(value)
-            )
-          );
+          $getRoot().append($createParagraphNode().append($createTextNode(value)));
         },
         { discrete: true }
       );
@@ -72,8 +65,7 @@ function composer(inputMessage: string, selectedImages: File[]) {
     selectedImages,
     handleSendMessage: jest.fn(),
     isGenerating: false,
-    isAgentMode: true,
-    app: { workspace: { getActiveFile: () => null, on: jest.fn(), offref: jest.fn() } },
+    app: { workspace: { getActiveFile: () => null, on: jest.fn(), off: jest.fn(), offref: jest.fn() } },
     contextNotes: [],
     setContextNotes: jest.fn(),
     setInputMessage: jest.fn(),
@@ -99,27 +91,17 @@ describe("ChatInput", () => {
   });
   describe("prependContent()", () => {
     it.each(["draft in progress", ""])(
-      "restores agents, web context, and resolved text ahead of draft %p without losing existing pills https://github.com/Brevilabs/obsidian-copilot-private/issues/485",
+      "restores web context and resolved text ahead of draft %p without losing the draft https://github.com/Brevilabs/obsidian-copilot-private/issues/485",
       (current) => {
         const { props, send } = composer(current, []);
         const ref: React.RefObject<ChatInputHandle> = { current: null };
         render(<ChatInput {...props} ref={ref} />);
         const webTab = { url: "https://example.com/report", title: "Report" };
-        act(() => ref.current!.prependContent("Review these changes", ["claude"], [webTab]));
-        const restored = mockEditor.getEditorState().read(() => ({
-          text: $getRoot().getTextContent(),
-          nodes: $getRoot()
-            .getChildren()
-            .flatMap((node) =>
-              "getChildren" in node ? (node as import("lexical").ElementNode).getChildren() : []
-            ),
-        }));
-        expect(restored.text).toBe("Review these changes" + (current ? "\n\n" + current : ""));
-        expect(restored.nodes.filter($isAgentPillNode).map((node) => node.getBackendId())).toEqual([
-          "claude",
-          "codex",
-        ]);
-        expect(props.setInputMessage).toHaveBeenCalledWith(restored.text);
+        act(() => ref.current!.prependContent("Review these changes", [webTab]));
+        const restored = mockEditor.getEditorState().read(() => $getRoot().getTextContent());
+
+        expect(restored).toBe("Review these changes" + (current ? "\n\n" + current : ""));
+        expect(props.setInputMessage).toHaveBeenCalledWith(restored);
         fireEvent.keyDown(screen.getByRole("textbox", { name: "Message" }), { key: "Enter" });
         expect(send).toHaveBeenCalledWith(expect.objectContaining({ webTabs: [webTab] }));
       }

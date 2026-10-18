@@ -5,9 +5,8 @@ import {
   providerRequiresApiKey,
   resolveChatModelSelectionId,
 } from "@/modelManagement";
-import { getModelKeyFromModel, settingsStore, useSettingsValue } from "@/settings/model";
+import { getModelKeyFromModel, settingsStore } from "@/settings/model";
 import type { ModelSelectorEntry } from "@/components/ui/ModelSelector";
-import { lockedCopilotEntries, shouldPreviewCopilotModels } from "@/lib/lockedCopilotEntries";
 import { useAtomValue } from "jotai";
 import React from "react";
 
@@ -19,12 +18,10 @@ export interface ChatModelPickerOverride {
 
 const NOOP = () => {};
 
-const EMPTY_LOCKED_ROWS: readonly ModelSelectorEntry[] = Object.freeze([]);
-
 const EMPTY_ENTRY: ModelSelectorEntry = {
   name: "__chat_no_models__",
   provider: "",
-  displayName: "No models — enable in Basic → Agents → Quick Chat",
+  displayName: "No models — add a local provider in Settings",
   enabled: true,
   _disabledReason: "Add a model",
 };
@@ -37,15 +34,6 @@ export function useChatModelPicker(params: {
 }): ChatModelPickerOverride {
   const { value, onChange, fallbackToFirst = true } = params;
   const entries = useAtomValue(chatBackendPickerAtom, { store: settingsStore });
-  const settings = useSettingsValue();
-
-  const lockedRows = React.useMemo(
-    () =>
-      shouldPreviewCopilotModels(settings.providers)
-        ? lockedCopilotEntries(settings.copilotPlusCatalog)
-        : EMPTY_LOCKED_ROWS,
-    [settings.providers, settings.copilotPlusCatalog]
-  );
 
   const { models, byModelKey, idToModelKey } = React.useMemo(() => {
     const models: ModelSelectorEntry[] = [];
@@ -63,7 +51,6 @@ export function useChatModelPicker(params: {
         enabled: true,
         capabilities,
         _disabledReason: needsKey ? "Add API key" : undefined,
-        _needsSelfHostWarning: entry.needsSelfHostWarning,
       };
       const modelKey = getModelKeyFromModel(modelEntry);
       models.push(modelEntry);
@@ -78,14 +65,6 @@ export function useChatModelPicker(params: {
     return (resolvedId && idToModelKey.get(resolvedId)) || "";
   }, [entries, value, idToModelKey, fallbackToFirst]);
 
-  const displayModels = React.useMemo(() => {
-    if (!models.some((m) => m._needsSelfHostWarning)) return models;
-    const local: ModelSelectorEntry[] = [];
-    const cloud: ModelSelectorEntry[] = [];
-    for (const m of models) (m._needsSelfHostWarning ? cloud : local).push(m);
-    return [...local, ...cloud];
-  }, [models]);
-
   const handleChange = React.useCallback(
     (modelKey: string) => {
       const id = byModelKey.get(modelKey);
@@ -94,12 +73,12 @@ export function useChatModelPicker(params: {
     [byModelKey, onChange]
   );
 
-  if (displayModels.length === 0) {
-    return { models: [...lockedRows, EMPTY_ENTRY], value: EMPTY_ENTRY_KEY, onChange: NOOP };
+  if (models.length === 0) {
+    return { models: [EMPTY_ENTRY], value: EMPTY_ENTRY_KEY, onChange: NOOP };
   }
 
   return {
-    models: lockedRows.length > 0 ? [...lockedRows, ...displayModels] : displayModels,
+    models,
     value: resolvedValue,
     onChange: handleChange,
   };

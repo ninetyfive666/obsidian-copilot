@@ -1,4 +1,4 @@
-export type ProviderType = "anthropic" | "openai-compatible" | "google";
+export type ProviderType = "openai-compatible";
 
 export interface ModelInfo {
   id: string;

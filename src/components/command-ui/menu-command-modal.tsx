@@ -163,7 +163,6 @@ export function MenuCommandModal({
                 value={selectedModel}
                 onChange={onSelectModel}
                 models={models ?? settings.activeModels}
-                apiKeySettings={models ? undefined : settings}
                 disabled={isBusy}
               />
               {onOpenModelSettings && (

@@ -2,8 +2,6 @@ import type { BaseChatModel } from "@langchain/core/language_models/chat_models"
 
 import type { ProviderType } from "@/modelManagement/types/catalog";
 import type { VerificationResult } from "@/modelManagement/types/runtime";
-import { anthropicAdapter } from "./anthropicAdapter";
-import { googleAdapter } from "./googleAdapter";
 import { openaiCompatibleAdapter } from "./openaiCompatibleAdapter";
 import type { AdapterBuildContext, AdapterVerifyContext, ProviderAdapter } from "./ProviderAdapter";
 
@@ -47,8 +45,6 @@ export class ProviderAdapterRegistry {
 
 export function createDefaultAdapterRegistry(): ProviderAdapterRegistry {
   const registry = new ProviderAdapterRegistry();
-  registry.register(anthropicAdapter);
   registry.register(openaiCompatibleAdapter);
-  registry.register(googleAdapter);
   return registry;
 }

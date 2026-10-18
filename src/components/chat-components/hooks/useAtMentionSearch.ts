@@ -9,15 +9,8 @@ import { useAllNotes } from "./useAllNotes";
 import { useAllFolders } from "./useAllFolders";
 import { useOpenWebTabs } from "./useOpenWebTabs";
 import { useActiveWebTabState } from "./useActiveWebTabState";
-import {
-  AgentMentionBrand,
-  AtMentionCategory,
-  AtMentionOption,
-  CategoryOption,
-  EMPTY_AGENT_MENTION_BRANDS,
-} from "./useAtMentionCategories";
+import { AtMentionCategory, AtMentionOption, CategoryOption } from "./useAtMentionCategories";
 import { getEffectiveCustomPromptsFolder } from "@/settings/copilotFolder";
-import { SelfHostCloudWarningIcon } from "@/components/ui/SelfHostCloudWarningIcon";
 
 const MAX_SEARCH_RESULTS = 30;
 
@@ -28,8 +21,7 @@ export function useAtMentionSearch(
   isCopilotPlus: boolean,
   showTools: boolean,
   availableCategoryOptions: CategoryOption[],
-  currentActiveFile: TFile | null = null,
-  agentBrands: ReadonlyArray<AgentMentionBrand> = EMPTY_AGENT_MENTION_BRANDS
+  currentActiveFile: TFile | null = null
 ): (CategoryOption | AtMentionOption)[] {
   const allNotes = useAllNotes(isCopilotPlus);
   const allFolders = useAllFolders();
@@ -112,24 +104,6 @@ export function useAtMentionSearch(
     [openWebTabs]
   );
 
-  const agentItems: AtMentionOption[] = useMemo(
-    () =>
-      agentBrands.map((brand) => ({
-        key: `agent-${brand.id}`,
-        title: brand.displayName,
-        subtitle: undefined,
-        category: "agents",
-        data: brand.id,
-        content: undefined,
-        icon: React.createElement(brand.Icon, { className: "tw-size-4" }),
-        trailingContent: brand.needsSelfHostWarning
-          ? React.createElement(SelfHostCloudWarningIcon)
-          : undefined,
-        searchKeyword: `${brand.displayName} ${brand.id}`,
-      })),
-    [agentBrands]
-  );
-
   return useMemo(() => {
     if (mode === "category") {
       if (!query) {
@@ -172,12 +146,6 @@ export function useAtMentionSearch(
         return tool.title.toLowerCase().includes(queryLower);
       });
 
-      const matchingAgents = agentItems.filter(
-        (agent) =>
-          agent.title.toLowerCase().includes(queryLower) ||
-          (typeof agent.data === "string" && agent.data.toLowerCase().includes(queryLower))
-      );
-
       const activeNoteTitle = "active note";
       const activeNoteMatches = activeNoteTitle.includes(queryLower);
       const activeNoteOption =
@@ -218,7 +186,6 @@ export function useAtMentionSearch(
       const rankedNonToolItems = fuzzySearchResults.map((result) => result.obj);
 
       return [
-        ...matchingAgents,
         ...matchingTools,
         ...(activeWebTabOption ? [activeWebTabOption] : []),
         ...(activeNoteOption ? [activeNoteOption] : []),
@@ -228,9 +195,6 @@ export function useAtMentionSearch(
       let items: AtMentionOption[] = [];
 
       switch (selectedCategory) {
-        case "agents":
-          items = agentItems;
-          break;
         case "notes":
           items = noteItems;
           break;
@@ -285,7 +249,6 @@ export function useAtMentionSearch(
     toolItems,
     folderItems,
     webTabItems,
-    agentItems,
     availableCategoryOptions,
     activeWebTab,
     currentActiveFile,

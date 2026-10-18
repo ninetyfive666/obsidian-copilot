@@ -4,13 +4,11 @@ import {
   DEFAULT_QA_EXCLUSIONS_SETTING,
   DEFAULT_SETTINGS,
   SEND_SHORTCUT,
-  BUILTIN_CHAT_MODELS,
 } from "@/constants";
 import {
   normalizeRootFolders,
   resetSettings,
   sanitizeEnvOverrides,
-  sanitizeBuiltinPreferences,
   sanitizeQaExclusions,
   sanitizeSettings,
   settingsAtom,
@@ -20,18 +18,6 @@ import {
   getModelKeyFromModel,
 } from "@/settings/model";
 import { CustomModel } from "@/aiParams";
-
-function sanitizeClaudeSlice(autoModePermission: unknown): CopilotSettings {
-  return sanitizeSettings({
-    ...DEFAULT_SETTINGS,
-    agentMode: {
-      enabled: true,
-      byok: {},
-      activeBackend: "claude",
-      backends: { claude: { autoModePermission } },
-    },
-  } as unknown as CopilotSettings);
-}
 
 describe("model", () => {
   describe("sanitizeQaExclusions()", () => {
@@ -151,377 +137,46 @@ describe("model", () => {
       );
     });
 
-    it("creates a default agentMode slice when missing", () => {
-      const sanitized = sanitizeSettings({
-        ...DEFAULT_SETTINGS,
-        agentMode: undefined as unknown as never,
-      });
-      expect(sanitized.agentMode).toEqual({
-        byok: {},
-        activeBackend: "opencode",
-        backends: {},
-        debugFullFrames: true,
-        notificationSound: true,
-        notificationSoundId: "piano",
-        welcomeDismissed: false,
-        skills: {
-          folder: "copilot/skills",
-          builtinPreferences: {
-            "copilot-web-search": { disabled: true },
-            "copilot-web-fetch": { disabled: true },
-            "copilot-read-pdf": { disabled: true },
-          },
-        },
-      });
-    });
+    it.each(["userId", "plusLicenseKey", "isPaidUser", "openAIApiKey", "supadataApiKey"])(
+      "strips the retired field %s from persisted settings",
+      (field) => {
+        const legacy = { ...DEFAULT_SETTINGS, [field]: "obsolete-value" } as unknown as Record<
+          string,
+          unknown
+        >;
 
-    it("defaults notificationSound to on so an unattended turn still calls the user back", () => {
-      const sanitized = sanitizeSettings({
-        ...DEFAULT_SETTINGS,
-        agentMode: {
-          byok: {},
-          activeBackend: "opencode",
-          backends: {},
-        },
-      } as unknown as CopilotSettings);
-      expect(sanitized.agentMode.notificationSound).toBe(true);
-    });
+        const sanitized = sanitizeSettings(legacy as unknown as CopilotSettings);
 
-    it("keeps a chosen notification sound and drops one no longer in the catalog (https://github.com/logancyang/obsidian-copilot/issues/2987)", () => {
-      const chosen = sanitizeSettings({
-        ...DEFAULT_SETTINGS,
-        agentMode: {
-          byok: {},
-          activeBackend: "opencode",
-          backends: {},
-          notificationSoundId: "doorbell",
-        },
-      } as unknown as CopilotSettings);
-      expect(chosen.agentMode.notificationSoundId).toBe("doorbell");
+        expect(field in (sanitized as unknown as Record<string, unknown>)).toBe(false);
+      }
+    );
 
-      const removed = sanitizeSettings({
-        ...DEFAULT_SETTINGS,
-        agentMode: {
-          byok: {},
-          activeBackend: "opencode",
-          backends: {},
-          notificationSoundId: "removed-sound",
-        },
-      } as unknown as CopilotSettings);
-      expect(removed.agentMode.notificationSoundId).toBe(
-        DEFAULT_SETTINGS.agentMode.notificationSoundId
-      );
-    });
-
-    it("preserves an explicit notificationSound=false (a user who muted it stays muted)", () => {
-      const sanitized = sanitizeSettings({
-        ...DEFAULT_SETTINGS,
-        agentMode: {
-          byok: {},
-          activeBackend: "opencode",
-          backends: {},
-          notificationSound: false,
-        },
-      } as unknown as CopilotSettings);
-      expect(sanitized.agentMode.notificationSound).toBe(false);
-    });
-
-    it("preserves an explicit debugFullFrames=false (a user who turned it off stays off)", () => {
-      const sanitized = sanitizeSettings({
-        ...DEFAULT_SETTINGS,
-        agentMode: {
-          byok: {},
-          activeBackend: "opencode",
-          backends: {},
-          debugFullFrames: false,
-        },
-      } as unknown as CopilotSettings);
-      expect(sanitized.agentMode.debugFullFrames).toBe(false);
-    });
-
-    it("falls back to debugFullFrames=true when the persisted value is not a boolean", () => {
-      const sanitized = sanitizeSettings({
-        ...DEFAULT_SETTINGS,
-        agentMode: {
-          byok: {},
-          activeBackend: "opencode",
-          backends: {},
-          debugFullFrames: "yes" as unknown as boolean,
-        },
-      } as unknown as CopilotSettings);
-      expect(sanitized.agentMode.debugFullFrames).toBe(true);
-    });
-
-    it("leaves backends empty when no legacy fields and no existing slice", () => {
-      const sanitized = sanitizeSettings({
-        ...DEFAULT_SETTINGS,
-        agentMode: { enabled: true, byok: {} },
-      } as unknown as CopilotSettings);
-      expect(sanitized.agentMode.backends).toEqual({});
-    });
-
-    it("preserves an already-migrated backends.opencode slice", () => {
-      const migrated = {
-        ...DEFAULT_SETTINGS,
-        agentMode: {
-          enabled: true,
-          byok: {},
-          activeBackend: "opencode",
-          backends: {
-            opencode: {
-              binaryPath: "/new/opencode",
-              binaryVersion: "2.0.0",
-              binarySource: "custom",
-            },
-          },
-        },
-      } as unknown as CopilotSettings;
-
-      const sanitized = sanitizeSettings(migrated);
-
-      expect(sanitized.agentMode.backends.opencode).toEqual({
-        binaryPath: "/new/opencode",
-        binaryVersion: "2.0.0",
-        binarySource: "custom",
-      });
-    });
-
-    it("defaults binarySource to 'managed' when path is set but source is missing or invalid", () => {
+    it("strips the retired agentMode slice and the retired copilotPlusCatalog cache", () => {
       const legacy = {
         ...DEFAULT_SETTINGS,
-        agentMode: {
-          enabled: true,
-          byok: {},
-          backends: {
-            opencode: { binaryPath: "/p", binaryVersion: "1.0.0", binarySource: "garbage" },
-          },
-        },
-      } as unknown as CopilotSettings;
+        agentMode: { enabled: true, backends: {} },
+        copilotPlusCatalog: { models: [], defaultEnabledIds: [] },
+      } as unknown as Record<string, unknown>;
 
-      const sanitized = sanitizeSettings(legacy);
+      const sanitized = sanitizeSettings(legacy as unknown as CopilotSettings);
+      const sanitizedRecord = sanitized as unknown as Record<string, unknown>;
 
-      expect(sanitized.agentMode.backends.opencode?.binarySource).toBe("managed");
+      expect("agentMode" in sanitizedRecord).toBe(false);
+      expect("copilotPlusCatalog" in sanitizedRecord).toBe(false);
     });
 
-    it("clears binarySource when no binaryPath is set", () => {
-      const settings = {
+    it("strips the retired Miyo settings from persisted settings", () => {
+      const legacy = {
         ...DEFAULT_SETTINGS,
-        agentMode: {
-          enabled: true,
-          byok: {},
-          backends: { opencode: { binarySource: "managed" } },
-        },
-      } as unknown as CopilotSettings;
-
-      const sanitized = sanitizeSettings(settings);
-
-      expect(sanitized.agentMode.backends.opencode).toEqual({
-        binaryPath: undefined,
-        binaryVersion: undefined,
-        binarySource: undefined,
-      });
-    });
-
-    it("defaults agentMode.welcomeDismissed to false when absent", () => {
-      const sanitized = sanitizeSettings({
-        ...DEFAULT_SETTINGS,
-        agentMode: { byok: {} } as unknown as CopilotSettings["agentMode"],
-      });
-      expect(sanitized.agentMode.welcomeDismissed).toBe(false);
-    });
-
-    it("carries a persisted agentMode.welcomeDismissed=true through sanitize", () => {
-      const sanitized = sanitizeSettings({
-        ...DEFAULT_SETTINGS,
-        agentMode: {
-          byok: {},
-          welcomeDismissed: true,
-        } as unknown as CopilotSettings["agentMode"],
-      });
-      expect(sanitized.agentMode.welcomeDismissed).toBe(true);
-    });
-
-    it("ignores a non-boolean agentMode.welcomeDismissed, falling back to false", () => {
-      const sanitized = sanitizeSettings({
-        ...DEFAULT_SETTINGS,
-        agentMode: {
-          byok: {},
-          welcomeDismissed: "yes",
-        } as unknown as CopilotSettings["agentMode"],
-      });
-      expect(sanitized.agentMode.welcomeDismissed).toBe(false);
-    });
-
-    it("drops invalid envOverrides keys from the Claude backend slice while keeping valid ones", () => {
-      const settings = {
-        ...DEFAULT_SETTINGS,
-        agentMode: {
-          enabled: true,
-          byok: {},
-          activeBackend: "claude",
-          backends: {
-            claude: { envOverrides: { CLAUDE_CONFIG_DIR: "/x", "BAD KEY": "y" } },
-          },
-        },
-      } as unknown as CopilotSettings;
-
-      const sanitized = sanitizeSettings(settings);
-
-      expect(sanitized.agentMode.backends.claude?.envOverrides).toEqual({
-        CLAUDE_CONFIG_DIR: "/x",
-      });
-    });
-
-    it("migrates legacy Miyo settings and strips obsolete remote vault path state", () => {
-      const legacySettings = {
-        ...DEFAULT_SETTINGS,
-        enableMiyo: undefined,
-        enableMiyoSearch: true,
+        enableMiyo: true,
         miyoServerUrl: "http://127.0.0.1:8742",
-        miyoRemoteVaultPath: "\\\\Mac\\Home\\Downloads\\graham-essays-main",
-      } as unknown as CopilotSettings;
+      } as unknown as Record<string, unknown>;
 
-      const sanitized = sanitizeSettings(legacySettings);
-
-      expect(sanitized.enableMiyo).toBe(true);
-      expect(sanitized.miyoServerUrl).toBe("http://127.0.0.1:8742");
+      const sanitized = sanitizeSettings(legacy as unknown as CopilotSettings);
       const sanitizedRecord = sanitized as unknown as Record<string, unknown>;
 
-      expect("miyoRemoteVaultPath" in sanitizedRecord).toBe(false);
-      expect("enableMiyoSearch" in sanitizedRecord).toBe(false);
-    });
-
-    it("assigns a userId while stripping obsolete Miyo keys", () => {
-      const legacySettings = {
-        ...DEFAULT_SETTINGS,
-        userId: "",
-        miyoRemoteVaultPath: "\\\\Mac\\Home\\Downloads\\graham-essays-main",
-      };
-
-      const sanitized = sanitizeSettings(legacySettings);
-      const sanitizedRecord = sanitized as unknown as Record<string, unknown>;
-
-      expect(sanitized.userId).toBeTruthy();
-      expect("miyoRemoteVaultPath" in sanitizedRecord).toBe(false);
-    });
-
-    it("renames legacy enableSelfHostedSearch=true to enableSelfHostMode", () => {
-      const legacy = {
-        ...DEFAULT_SETTINGS,
-        enableSelfHostMode: undefined,
-        enableSelfHostedSearch: true,
-      } as unknown as CopilotSettings;
-
-      const sanitized = sanitizeSettings(legacy);
-
-      expect(sanitized.enableSelfHostMode).toBe(true);
-    });
-
-    it("defaults docProcessorBackend to 'plus' when missing", () => {
-      const out = sanitizeSettings({
-        ...DEFAULT_SETTINGS,
-        docProcessorBackend: undefined,
-      } as unknown as CopilotSettings);
-      expect(out.docProcessorBackend).toBe("plus");
-    });
-
-    it("resets an invalid docProcessorBackend to 'plus'", () => {
-      const out = sanitizeSettings({
-        ...DEFAULT_SETTINGS,
-        docProcessorBackend: "bogus",
-      } as unknown as CopilotSettings);
-      expect(out.docProcessorBackend).toBe("plus");
-    });
-
-    it("preserves docProcessorBackend='miyo'", () => {
-      const out = sanitizeSettings({
-        ...DEFAULT_SETTINGS,
-        docProcessorBackend: "miyo",
-      });
-      expect(out.docProcessorBackend).toBe("miyo");
-    });
-
-    it.each(["http://miyo-home:8742", "http://127.0.0.1:8742"])(
-      "preserves the legacy endpoint %s without requiring local discovery — https://github.com/Brevilabs/obsidian-copilot-private/issues/466",
-      (miyoServerUrl) => {
-        const settings = sanitizeSettings({ ...DEFAULT_SETTINGS, miyoServerUrl });
-        expect(settings.miyoConnectionMode).toBe("remote");
-        expect(settings.miyoServerUrl).toBe(miyoServerUrl);
-      }
-    );
-
-    it("retains a saved server address while local mode stays selected after reload — https://github.com/Brevilabs/obsidian-copilot-private/issues/466", () => {
-      const settings = sanitizeSettings({
-        ...DEFAULT_SETTINGS,
-        miyoServerUrl: "http://remote:8742",
-        miyoConnectionMode: "local",
-      });
-      expect(settings.miyoConnectionMode).toBe("local");
-      expect(settings.miyoServerUrl).toBe("http://remote:8742");
-      expect(sanitizeSettings(settings)).toEqual(settings);
-    });
-
-    it("starts a fresh configuration with this computer — https://github.com/Brevilabs/obsidian-copilot-private/issues/466", () => {
-      expect(sanitizeSettings({ ...DEFAULT_SETTINGS }).miyoConnectionMode).toBe("local");
-    });
-
-    it("defaults the startup notice marker without inheriting the Agent Home dismissal", () => {
-      const persisted = { ...DEFAULT_SETTINGS, lastDismissedVersion: "4.1.0" };
-      delete (persisted as Partial<CopilotSettings>).lastShownStartupVersion;
-      const loaded = sanitizeSettings(persisted);
-      expect(loaded.lastShownStartupVersion).toBeNull();
-      expect(loaded.lastDismissedVersion).toBe("4.1.0");
-    });
-
-    it("preserves distinct startup notice and Agent Home dismissal versions", () => {
-      const loaded = sanitizeSettings({
-        ...DEFAULT_SETTINGS,
-        lastDismissedVersion: "4.0.9",
-        lastShownStartupVersion: "4.1.0",
-      });
-      expect(loaded.lastShownStartupVersion).toBe("4.1.0");
-      expect(loaded.lastDismissedVersion).toBe("4.0.9");
-    });
-
-    it("preserves valid built-in opt-outs and drops malformed preference values https://github.com/logancyang/obsidian-copilot/issues/3022", () => {
-      const result = sanitizeSettings({
-        ...DEFAULT_SETTINGS,
-        agentMode: {
-          ...DEFAULT_SETTINGS.agentMode,
-          skills: {
-            folder: "copilot/skills",
-            builtinPreferences: {
-              "copilot-web-search": { disabled: true, disabledAgents: ["opencode", 3] },
-              invalid: null,
-              malformedArray: [],
-            },
-          },
-        },
-      } as unknown as CopilotSettings);
-      expect(result.agentMode.skills.builtinPreferences).toEqual({
-        "copilot-web-search": { disabled: true, disabledAgents: ["opencode"] },
-      });
-    });
-
-    it.each(["parallel", "exa"] as const)(
-      "preserves the %s self-host search provider (https://github.com/Brevilabs/obsidian-copilot-private/issues/285)",
-      (provider) => {
-        const sanitized = sanitizeSettings({
-          ...DEFAULT_SETTINGS,
-          selfHostSearchProvider: provider,
-        });
-
-        expect(sanitized.selfHostSearchProvider).toBe(provider);
-      }
-    );
-
-    it("falls back to Firecrawl for an unknown self-host search provider (https://github.com/Brevilabs/obsidian-copilot-private/issues/285)", () => {
-      const sanitized = sanitizeSettings({
-        ...DEFAULT_SETTINGS,
-        selfHostSearchProvider: "unknown",
-      } as unknown as CopilotSettings);
-
-      expect(sanitized.selfHostSearchProvider).toBe("firecrawl");
+      expect("enableMiyo" in sanitizedRecord).toBe(false);
+      expect("miyoServerUrl" in sanitizedRecord).toBe(false);
     });
 
     it("turns live Relevant Notes updates on for settings written before the field existed (https://github.com/Brevilabs/obsidian-copilot-private/issues/362)", () => {
@@ -553,18 +208,6 @@ describe("model", () => {
 
       expect("maxTokens" in (sanitized as unknown as Record<string, unknown>)).toBe(false);
       expect(sanitized.contextTurns).toBe(4);
-    });
-
-    it("keeps a Claude auto permission mode the SDK understands", () => {
-      const sanitized = sanitizeClaudeSlice("acceptEdits");
-
-      expect(sanitized.agentMode.backends.claude?.autoModePermission).toBe("acceptEdits");
-    });
-
-    it("drops an unsupported Claude auto permission mode so the descriptor default applies", () => {
-      const sanitized = sanitizeClaudeSlice("dontAsk");
-
-      expect(sanitized.agentMode.backends.claude?.autoModePermission).toBeUndefined();
     });
 
     it("coerces a retired `project` defaultChainType so chain construction never sees it (https://github.com/logancyang/obsidian-copilot-preview/issues/310)", () => {
@@ -662,83 +305,13 @@ describe("model", () => {
       expect(kept.copilotFolder).toBe("team/ai");
     });
 
-    it.each([
-      ["a missing cache, as every pre-upgrade data.json has", undefined],
-      ["a non-object cache", "nope"],
-      ["a cache whose models are not a list", { models: "nope", defaultEnabledIds: [] }],
-      ["a model entry that is null", { models: [null], defaultEnabledIds: [] }],
-      [
-        "a model entry with no id",
-        { models: [{ displayName: "Nameless" }], defaultEnabledIds: [] },
-      ],
-      [
-        "a model entry with a non-string id",
-        { models: [{ id: 7, displayName: "Seven" }], defaultEnabledIds: [] },
-      ],
-      [
-        "a non-string default-enabled id",
-        { models: [{ id: "a", displayName: "A" }], defaultEnabledIds: [7] },
-      ],
-    ])(
-      "replaces %s with an empty Copilot Plus lineup (https://github.com/Brevilabs/obsidian-copilot-private/issues/319)",
-      (_case, copilotPlusCatalog) => {
-        const out = sanitizeSettings({
-          ...DEFAULT_SETTINGS,
-          copilotPlusCatalog,
-        } as unknown as CopilotSettings);
-
-        expect(out.copilotPlusCatalog).toEqual({ models: [], defaultEnabledIds: [] });
-      }
-    );
-
-    it("keeps a well-formed cached Copilot Plus lineup", () => {
-      const copilotPlusCatalog = {
-        models: [{ id: "glm-5.2", displayName: "GLM-5.2" }],
-        defaultEnabledIds: ["glm-5.2"],
-      };
-
-      const out = sanitizeSettings({ ...DEFAULT_SETTINGS, copilotPlusCatalog });
-
-      expect(out.copilotPlusCatalog).toEqual(copilotPlusCatalog);
-    });
-
-    it("preserves a valid deviceProfiles map and drops empty or invalid entries", () => {
-      const raw = {
-        agentMode: {
-          deviceProfiles: {
-            "device-a": {
-              claudeCliPath: "/a/claude",
-              opencode: { binaryPath: "/a/oc", binaryVersion: "1", binarySource: "custom" },
-              codex: { envOverrides: { GOOD: "1", "bad-key": "x" } },
-            },
-            "device-b": {},
-            "": { claudeCliPath: "/x" },
-          },
-        },
-      };
-
-      const out = sanitizeSettings(raw as unknown as CopilotSettings);
-      const profiles = out.agentMode.deviceProfiles ?? {};
-
-      expect(profiles["device-a"]?.claudeCliPath).toBe("/a/claude");
-      expect(profiles["device-a"]?.opencode?.binarySource).toBe("custom");
-      expect(profiles["device-a"]?.codex?.envOverrides).toEqual({ GOOD: "1" });
-      expect(profiles["device-b"]).toBeUndefined();
-      expect(profiles[""]).toBeUndefined();
-    });
-
-    it("marks every unannotated Codex path as custom ownership (https://github.com/Brevilabs/obsidian-copilot-private/issues/368)", () => {
+    it("renames retired autonomous agent tool ids and drops the retired web tools (https://github.com/Brevilabs/obsidian-copilot-private/issues/283)", () => {
       const out = sanitizeSettings({
-        agentMode: {
-          backends: { codex: { binaryPath: "/flat/codex" } },
-          deviceProfiles: {
-            "device-a": { codex: { binaryPath: "/profile/codex" } },
-          },
-        },
-      } as unknown as CopilotSettings);
+        ...DEFAULT_SETTINGS,
+        autonomousAgentEnabledToolIds: ["writeToFile", "webSearch", "youtubeTranscription", "search"],
+      });
 
-      expect(out.agentMode.backends.codex?.binarySource).toBe("custom");
-      expect(out.agentMode.deviceProfiles?.["device-a"]?.codex?.binarySource).toBe("custom");
+      expect(out.autonomousAgentEnabledToolIds).toEqual(["writeFile", "search"]);
     });
   });
 
@@ -800,40 +373,6 @@ describe("model", () => {
       for (let i = 0; i < 100; i++) big[`VAR_${i}`] = String(i);
       const sanitized = sanitizeEnvOverrides(big);
       expect(sanitized && Object.keys(sanitized).length).toBe(64);
-    });
-  });
-
-  describe("sanitizeBuiltinPreferences()", () => {
-    it.each([
-      undefined,
-      null,
-      false,
-      [],
-      {},
-      { "copilot-web-search": { disabled: false, disabledAgents: [] } },
-    ])(
-      "keeps absent, malformed, or default preferences empty: %p https://github.com/logancyang/obsidian-copilot/issues/3022",
-      (raw) => {
-        expect(sanitizeBuiltinPreferences(raw)).toBe(sanitizeBuiltinPreferences({}));
-        expect(sanitizeBuiltinPreferences(raw)).toEqual({});
-      }
-    );
-
-    it("drops retired names and malformed entries while preserving sparse overrides for known skills and absent agents https://github.com/logancyang/obsidian-copilot/issues/3022", () => {
-      expect(
-        sanitizeBuiltinPreferences({
-          "copilot-web-search": { disabled: true },
-          "copilot-web-fetch": { disabled: false, disabledAgents: ["uninstalled-agent", 3] },
-          "miyo-search": { disabled: true, disabledAgents: [] },
-          "copilot-read-pdf": null,
-          "miyo-parse": [],
-          "retired-skill": { disabled: true },
-        })
-      ).toEqual({
-        "copilot-web-search": { disabled: true },
-        "copilot-web-fetch": { disabledAgents: ["uninstalled-agent"] },
-        "miyo-search": { disabled: true },
-      });
     });
   });
 
@@ -948,51 +487,6 @@ describe("model", () => {
       expect(new Set(after.copilotRootHistory)).toEqual(new Set(["copilot", "ai", "team-ai"]));
     });
 
-    it("preserves the cached Copilot Plus lineup, which a reset does not re-fetch (https://github.com/Brevilabs/obsidian-copilot-private/issues/319)", () => {
-      const catalog = {
-        models: [{ id: "glm-5.2", displayName: "GLM-5.2", limits: { context: 262144 } }],
-        defaultEnabledIds: ["glm-5.2"],
-      };
-      settingsStore.set(settingsAtom, { ...DEFAULT_SETTINGS, copilotPlusCatalog: catalog });
-
-      resetSettings();
-
-      expect(settingsStore.get(settingsAtom).copilotPlusCatalog).toEqual(catalog);
-    });
-
-    it.each([false, true])(
-      "preserves a builtin model's credential routing, including enableCors=%s, while resetting its preferences (https://github.com/logancyang/obsidian-copilot-preview/issues/259)",
-      (enableCors) => {
-        const customGpt4: CustomModel = {
-          ...BUILTIN_CHAT_MODELS[0],
-          enabled: false,
-          apiKey: "sk-saved",
-          baseUrl: "https://proxy.example.test/v1",
-          openAIOrgId: "org-model",
-          enableCors,
-          displayName: "My renamed model",
-        };
-        settingsStore.set(settingsAtom, {
-          ...DEFAULT_SETTINGS,
-          activeModels: [customGpt4],
-        });
-
-        resetSettings();
-
-        const after = settingsStore.get(settingsAtom);
-        const restored = after.activeModels.find(
-          (m) => getModelKeyFromModel(m) === getModelKeyFromModel(BUILTIN_CHAT_MODELS[0])
-        );
-        expect(restored).toBeDefined();
-        expect(restored!.apiKey).toBe("sk-saved");
-        expect(restored!.baseUrl).toBe("https://proxy.example.test/v1");
-        expect(restored!.openAIOrgId).toBe("org-model");
-        expect(restored!.enableCors).toBe(enableCors);
-        expect(restored!.enabled).toBe(BUILTIN_CHAT_MODELS[0].enabled);
-        expect(restored!.displayName).toBe(BUILTIN_CHAT_MODELS[0].displayName);
-      }
-    );
-
     it("preserves every custom model, including rows that carry no key (https://github.com/logancyang/obsidian-copilot-preview/issues/259)", () => {
       const withKey: CustomModel = {
         name: "my-llama",
@@ -1020,75 +514,11 @@ describe("model", () => {
       expect(after.activeModels.find((m) => m.name === "ollama-llama")).toBeDefined();
     });
 
-    it("filters out null/undefined top-level secrets", () => {
-      settingsStore.set(settingsAtom, {
-        ...DEFAULT_SETTINGS,
-        openAIApiKey: "valid-key",
-        plusLicenseKey: "lic-12345",
-        anthropicApiKey: null as unknown as string,
-        googleApiKey: undefined as unknown as string,
-      });
-
-      resetSettings();
-
-      const after = settingsStore.get(settingsAtom);
-      expect(after.openAIApiKey).toBe("valid-key");
-      expect(after.plusLicenseKey).toBe("lic-12345");
-      expect(after.anthropicApiKey).toBe(DEFAULT_SETTINGS.anthropicApiKey);
-      expect(after.googleApiKey).toBe(DEFAULT_SETTINGS.googleApiKey);
-    });
-
-    it("preserves the top-level vendor config a retained key needs to reach its service (https://github.com/logancyang/obsidian-copilot-preview/issues/259)", () => {
-      const vendorConfig = {
-        openAIOrgId: "org-123",
-        azureOpenAIApiInstanceName: "my-instance",
-        azureOpenAIApiDeploymentName: "chat-deploy",
-        azureOpenAIApiVersion: "2025-01-01-preview",
-      };
-      settingsStore.set(settingsAtom, { ...DEFAULT_SETTINGS, ...vendorConfig });
-
-      resetSettings();
-
-      expect(settingsStore.get(settingsAtom)).toMatchObject(vendorConfig);
-    });
-
-    it("keeps a signed-in user's paid state and license but drops the entitlement token, so reset never reads as sign-out (https://github.com/logancyang/obsidian-copilot-preview/issues/259)", () => {
-      settingsStore.set(settingsAtom, {
-        ...DEFAULT_SETTINGS,
-        isPaidUser: true,
-        isPlusUser: true,
-        plusLicenseKey: "lic-12345",
-        entitlementToken: "test-stale-entitlement-token",
-        entitlementExpiresAt: 4_000_000_000_000,
-      });
-
-      resetSettings();
-
-      const after = settingsStore.get(settingsAtom);
-      expect(after.isPaidUser).toBe(true);
-      expect(after.entitlementExpiresAt).toBe(4_000_000_000_000);
-      expect(after.plusLicenseKey).toBe("lic-12345");
-      expect(after.isPlusUser).toBe(DEFAULT_SETTINGS.isPlusUser);
-      expect(after.entitlementToken).toBe(DEFAULT_SETTINGS.entitlementToken);
-    });
-
-    it("drops a bundle value whose type its consumer cannot handle (https://github.com/logancyang/obsidian-copilot-preview/issues/259)", () => {
-      settingsStore.set(settingsAtom, {
-        ...DEFAULT_SETTINGS,
-        openAIApiKey: "sk-openai",
-        openAIOrgId: {} as unknown as string,
-      });
-
-      resetSettings();
-
-      const after = settingsStore.get(settingsAtom);
-      expect(after.openAIApiKey).toBe("sk-openai");
-      expect(after.openAIOrgId).toBe(DEFAULT_SETTINGS.openAIOrgId);
-    });
-
-    it("filters out null/undefined model secrets", () => {
+    it("keeps a custom row with a null secret intact so the keychain entry keeps its identity (https://github.com/logancyang/obsidian-copilot-preview/issues/259)", () => {
       const modelWithNull: CustomModel = {
-        ...BUILTIN_CHAT_MODELS[0],
+        name: "my-llama",
+        provider: "openai",
+        enabled: true,
         apiKey: null as unknown as string,
       };
       settingsStore.set(settingsAtom, {
@@ -1099,11 +529,9 @@ describe("model", () => {
       resetSettings();
 
       const after = settingsStore.get(settingsAtom);
-      const restored = after.activeModels.find(
-        (m) => getModelKeyFromModel(m) === getModelKeyFromModel(BUILTIN_CHAT_MODELS[0])
-      );
+      const restored = after.activeModels.find((m) => m.name === "my-llama");
       expect(restored).toBeDefined();
-      expect(restored!.apiKey).toBe(BUILTIN_CHAT_MODELS[0].apiKey);
+      expect(restored?.apiKey).toBeNull();
     });
 
     it("preserves configured models belonging to preserved providers (https://github.com/logancyang/obsidian-copilot-preview/issues/259)", () => {
@@ -1170,7 +598,6 @@ describe("model", () => {
         },
         backends: {
           chat: { enabledModels: ["model-1", "model-2"] },
-          opencode: { enabledModels: ["model-3"] },
         },
       });
 

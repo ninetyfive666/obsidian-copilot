@@ -5,7 +5,6 @@ jest.mock("obsidian", () => ({
 
 import type CopilotPlugin from "@/main";
 import { registerNoteHeaderAction } from "@/editor/registerNoteHeaderAction";
-import { COPILOT_AGENT_ICON_ID } from "@/constants";
 import { MarkdownView, TFile, type WorkspaceLeaf } from "obsidian";
 
 interface NoteView extends MarkdownView {
@@ -33,7 +32,7 @@ function fixture(views: NoteView[]) {
   const listeners = new Map<string, () => void>();
   let layoutReady: () => void = () => undefined;
   let cleanup: () => void = () => undefined;
-  const addNoteToAgentChat = jest.fn().mockResolvedValue(undefined);
+  const addNoteToActiveChat = jest.fn().mockResolvedValue(undefined);
   const workspace = {
     getLeavesOfType: jest.fn(() => views.map((view) => ({ view }) as unknown as WorkspaceLeaf)),
     onLayoutReady: jest.fn((callback: () => void) => {
@@ -46,7 +45,7 @@ function fixture(views: NoteView[]) {
   };
   const plugin = {
     app: { workspace },
-    addNoteToAgentChat,
+    addNoteToActiveChat,
     registerEvent: jest.fn(),
     register: jest.fn((callback: () => void) => {
       cleanup = callback;
@@ -58,7 +57,7 @@ function fixture(views: NoteView[]) {
     listeners,
     layoutReady: () => layoutReady(),
     cleanup: () => cleanup(),
-    addNoteToAgentChat,
+    addNoteToActiveChat,
   };
 }
 
@@ -66,17 +65,17 @@ describe("registerNoteHeaderAction", () => {
   it("https://github.com/Brevilabs/obsidian-copilot-private/issues/579 adds a Copilot action to every open note and passes the clicked view's current file", () => {
     const research = noteView("Research.md");
     const journal = noteView("Journal.md");
-    const { plugin, layoutReady, addNoteToAgentChat } = fixture([research, journal]);
+    const { plugin, layoutReady, addNoteToActiveChat } = fixture([research, journal]);
 
     registerNoteHeaderAction(plugin);
     layoutReady();
     const button = research.addAction.mock.results[0].value as HTMLButtonElement;
-    expect(button.dataset.icon).toBe(COPILOT_AGENT_ICON_ID);
-    expect(button.getAttribute("aria-label")).toBe("Open Copilot Agent Chat with this note");
+    expect(button.dataset.icon).toBe("message-square");
+    expect(button.getAttribute("aria-label")).toBe("Add note to Copilot chat");
 
     research.file = Object.assign(new TFile(), { path: "Reused tab.md" });
     button.click();
-    expect(addNoteToAgentChat).toHaveBeenCalledWith(research.file, true);
+    expect(addNoteToActiveChat).toHaveBeenCalledWith(research.file);
     expect(journal.addAction).toHaveBeenCalledTimes(1);
   });
 
@@ -100,15 +99,15 @@ describe("registerNoteHeaderAction", () => {
     expect((second.addAction.mock.results[0].value as HTMLElement).isConnected).toBe(false);
   });
 
-  it("https://github.com/Brevilabs/obsidian-copilot-private/issues/579 leaves Agent Chat closed when the clicked Markdown view has no note", () => {
+  it("https://github.com/Brevilabs/obsidian-copilot-private/issues/579 does nothing when the clicked Markdown view has no note", () => {
     const view = noteView("Research.md");
-    const { plugin, layoutReady, addNoteToAgentChat } = fixture([view]);
+    const { plugin, layoutReady, addNoteToActiveChat } = fixture([view]);
 
     registerNoteHeaderAction(plugin);
     layoutReady();
     Object.assign(view, { file: null });
     (view.addAction.mock.results[0].value as HTMLButtonElement).click();
 
-    expect(addNoteToAgentChat).not.toHaveBeenCalled();
+    expect(addNoteToActiveChat).not.toHaveBeenCalled();
   });
 });

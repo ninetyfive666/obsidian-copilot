@@ -105,7 +105,6 @@ describe("copilotFolder", () => {
   describe("deriveSkillsFolder()", () => {
     it("derives the historical default skills path for the default root", () => {
       expect(deriveSkillsFolder(settingsWithRoot("copilot"))).toBe("copilot/skills");
-      expect(deriveSkillsFolder(DEFAULT_SETTINGS)).toBe(DEFAULT_SETTINGS.agentMode.skills.folder);
     });
 
     it("re-roots the skills folder under a custom root", () => {

@@ -11,7 +11,7 @@ jest.mock(
   "./stories.generated",
   () => {
     const loaders = [
-      jest.fn(() => Promise.resolve(jest.requireActual("@/agentMode/ui/AgentWelcomeCard.stories"))),
+      jest.fn(() => Promise.resolve(jest.requireActual("@/components/ui/ProjectFolderIcon.stories"))),
       jest.fn(() => Promise.resolve(jest.requireActual("@/components/ui/badge.stories"))),
       jest.fn(() => Promise.resolve(jest.requireActual("@/components/ui/button.stories"))),
       jest.fn(() => Promise.resolve(jest.requireActual("@/components/gallery-hosts.stories"))),
@@ -30,7 +30,7 @@ jest.mock(
     return {
       modules: [
         {
-          componentId: "@/agentMode/ui/AgentWelcomeCard",
+          componentId: "@/components/ui/ProjectFolderIcon",
           load: loaders[0],
         },
         {
@@ -424,8 +424,8 @@ describe("main", () => {
         expect(
           gallery.getByText("5 presentational components · 3 with stories · 2 missing")
         ).toBeTruthy();
-        expect(view.getState().selectedStoryId).toBe("Agent Mode/Agent Welcome Card/Default");
-        expect(gallery.getByText("Agent Mode/Agent Welcome Card/Default")).toBeTruthy();
+        expect(view.getState().selectedStoryId).toBe("Gallery/Host Environments/DefaultLeaf");
+        expect(gallery.getByText("Gallery/Host Environments/DefaultLeaf")).toBeTruthy();
 
         gallery.unmount();
       });
@@ -491,8 +491,8 @@ describe("main", () => {
         await firstView.onOpen();
         await secondView.onOpen();
 
-        expect(firstView.getState().selectedStoryId).toBe("Agent Mode/Agent Welcome Card/Default");
-        expect(secondView.getState().selectedStoryId).toBe("Agent Mode/Agent Welcome Card/Default");
+        expect(firstView.getState().selectedStoryId).toBe("Gallery/Host Environments/DefaultLeaf");
+        expect(secondView.getState().selectedStoryId).toBe("Gallery/Host Environments/DefaultLeaf");
         expect(mountViewRoot).toHaveBeenCalledTimes(2);
         expect(getGeneratedMock().loaders.every((loader) => loader.mock.calls.length === 1)).toBe(
           true
@@ -507,7 +507,6 @@ describe("main", () => {
         const handle = window.__gallery as GalleryHandle;
 
         expect(handle.list()).toEqual([
-          "Agent Mode/Agent Welcome Card/Default",
           "Gallery/Host Environments/DefaultLeaf",
           "Gallery/Host Environments/DeleteConfirmation",
           "Gallery/Host Environments/ModelPreferences",
@@ -521,6 +520,7 @@ describe("main", () => {
           "UI/Button/Disabled",
           "UI/Button/Sizes",
           "UI/Button/Variants",
+          "UI/Project Folder Icon/Default",
         ]);
 
         await handle.show("UI/Button/Sizes", { width: 512 });

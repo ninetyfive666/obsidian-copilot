@@ -10,11 +10,9 @@ import {
 } from "@/components/chat-components/utils/lexicalTextUtils";
 import {
   useAtMentionCategories,
-  AgentMentionBrand,
   AtMentionCategory,
   AtMentionOption,
   CategoryOption,
-  EMPTY_AGENT_MENTION_BRANDS,
 } from "@/components/chat-components/hooks/useAtMentionCategories";
 import { useAtMentionSearch } from "@/components/chat-components/hooks/useAtMentionSearch";
 
@@ -22,14 +20,12 @@ interface AtMentionCommandPluginProps {
   isCopilotPlus?: boolean;
   showTools?: boolean;
   currentActiveFile?: TFile | null;
-  agentBrands?: ReadonlyArray<AgentMentionBrand>;
 }
 
 export function AtMentionCommandPlugin({
   isCopilotPlus = false,
   showTools = false,
   currentActiveFile = null,
-  agentBrands = EMPTY_AGENT_MENTION_BRANDS,
 }: AtMentionCommandPluginProps): JSX.Element {
   const app = useApp();
   const [editor] = useLexicalComposerContext();
@@ -42,7 +38,7 @@ export function AtMentionCommandPlugin({
 
   const [currentPreviewContent, setCurrentPreviewContent] = useState<string>("");
 
-  const allCategoryOptions = useAtMentionCategories(showTools, agentBrands.length > 0);
+  const allCategoryOptions = useAtMentionCategories(showTools);
   const availableCategoryOptions = useMemo(
     () => allCategoryOptions.filter((c) => !c.isAction),
     [allCategoryOptions]
@@ -86,8 +82,7 @@ export function AtMentionCommandPlugin({
     isCopilotPlus,
     showTools,
     availableCategoryOptions,
-    currentActiveFile,
-    agentBrands
+    currentActiveFile
   );
 
   const isAtMentionOption = useCallback(

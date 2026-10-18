@@ -45,7 +45,7 @@ describe("openSettings", () => {
       } as unknown as Window;
       const app = { setting: { open, openTabById } } as unknown as App;
 
-      openCopilotSettings(app, ownerWindow, "miyo");
+      openCopilotSettings(app, ownerWindow, "byok");
 
       expect(open).toHaveBeenCalledTimes(1);
       expect(openTabById).not.toHaveBeenCalled();
@@ -53,7 +53,7 @@ describe("openSettings", () => {
       deferredHandoff?.(0);
 
       expect(openTabById).toHaveBeenCalledWith("copilot");
-      expect(consumedTabs).toEqual(["miyo"]);
+      expect(consumedTabs).toEqual(["byok"]);
     });
   });
 

@@ -5,18 +5,9 @@ import { act, fireEvent, render, screen, waitFor } from "@testing-library/react"
 import { Notice } from "obsidian";
 import React from "react";
 
-jest.mock("@/settings/v2/components/PlusSettings", () => ({ PlusSettings: () => null }));
-
-jest.mock("@/settings/v2/components/AgentSettings", () => ({
-  AgentSettings: () => <div data-testid="agents-section">agents</div>,
-}));
-
 jest.mock("@/settings/v2/components/QuickChatPanel", () => ({
-  QuickChatPanel: () => <div>Quick Chat models</div>,
+  QuickChatPanel: () => <div data-testid="quick-chat-panel">Quick Chat models</div>,
 }));
-
-const isDesktopRuntime = jest.fn<boolean, []>().mockReturnValue(true);
-jest.mock("@/utils/desktopRuntime", () => ({ isDesktopRuntime: () => isDesktopRuntime() }));
 
 jest.mock("@/context", () => {
   const app = {
@@ -84,25 +75,15 @@ describe("BasicSettings", () => {
       copilotRootContainsNotes.mockReturnValue(false);
       findCopilotRootFileConflict.mockReturnValue(null);
       systemPrompts.mockReturnValue([]);
-      isDesktopRuntime.mockReturnValue(true);
     });
 
-    it("puts the Agents section above General so setup comes before preferences", async () => {
+    it("puts the Quick Chat models section above General so model setup comes before preferences", async () => {
       render(<BasicSettings />);
-      const agents = await screen.findByTestId("agents-section");
+      const quickChat = await screen.findByTestId("quick-chat-panel");
       const general = screen.getByText("General");
       expect(
-        agents.compareDocumentPosition(general) & Node.DOCUMENT_POSITION_FOLLOWING
+        quickChat.compareDocumentPosition(general) & Node.DOCUMENT_POSITION_FOLLOWING
       ).toBeTruthy();
-    });
-
-    it("shows Quick Chat settings beside the desktop agent notice on mobile (https://github.com/Brevilabs/obsidian-copilot-private/issues/373)", async () => {
-      isDesktopRuntime.mockReturnValue(false);
-      render(<BasicSettings />);
-      expect(screen.getByText("Agent settings are available on desktop.")).not.toBeNull();
-      expect(screen.queryByTestId("agents-section")).toBeNull();
-      expect(screen.getByText("Quick Chat models")).not.toBeNull();
-      expect(screen.getByText("General")).not.toBeNull();
     });
 
     it("hides the filename template behind a collapsed Advanced disclosure", () => {

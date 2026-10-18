@@ -1,5 +1,4 @@
 import { DEFAULT_SETTINGS } from "@/constants";
-import { stripLegacyIndexSettings } from "@/settings/migrations/legacyIndexSettings";
 import { type CopilotSettings } from "@/settings/model";
 import { type CustomModel } from "@/aiParams";
 
@@ -77,8 +76,27 @@ function stripModelSecrets(models: CustomModel[]): CustomModel[] {
   });
 }
 
+// Settings that existed only for the removed embedding and index runtime:
+// https://github.com/Brevilabs/obsidian-copilot-private/issues/283
+const LEGACY_INDEX_SETTING_FIELDS = [
+  "enableSemanticSearchV3",
+  "embeddingModelKey",
+  "activeEmbeddingModels",
+  "embeddingRequestsPerMin",
+  "embeddingBatchSize",
+  "numPartitions",
+  "enableIndexSync",
+  "disableIndexOnMobile",
+  "indexVaultToVectorStore",
+  "openAIEmbeddingProxyBaseUrl",
+  "azureOpenAIApiEmbeddingDeploymentName",
+] as const;
+
 export function cleanupLegacyFields(settings: CopilotSettings): CopilotSettings {
-  const out = asRecord(stripLegacyIndexSettings(settings));
+  const out = asRecord({ ...settings });
+  for (const field of LEGACY_INDEX_SETTING_FIELDS) {
+    delete out[field];
+  }
   delete out.enableEncryption;
   delete out._keychainMigrated;
   delete out._keychainMigratedAt;

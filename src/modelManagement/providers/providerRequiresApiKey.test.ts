@@ -37,13 +37,8 @@ describe("providerRequiresApiKey", () => {
   });
 
   describe("providerNeedsResolvedApiKey()", () => {
-    it("needs a runtime key for required-key providers, Copilot Plus, and optional-key providers with a stored key, but not for an optional-key provider without one (https://github.com/logancyang/obsidian-copilot/issues/2895)", () => {
+    it("needs a runtime key for required-key providers and optional-key providers with a stored key, but not for an optional-key provider without one (https://github.com/logancyang/obsidian-copilot/issues/2895)", () => {
       expect(providerNeedsResolvedApiKey(provider({ requiresApiKey: true }))).toBe(true);
-      expect(
-        providerNeedsResolvedApiKey(
-          provider({ origin: { kind: "copilot-plus" }, requiresApiKey: false })
-        )
-      ).toBe(true);
       expect(
         providerNeedsResolvedApiKey(
           provider({ requiresApiKey: false, apiKeyKeychainId: "keychain-p1" })

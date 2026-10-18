@@ -17,14 +17,8 @@ import {
 } from "@/commands/quickCommandPrompts";
 import { CustomCommandChatModal } from "@/commands/CustomCommandChatModal";
 import { ApplyCustomCommandModal } from "@/components/modals/ApplyCustomCommandModal";
-import { YoutubeTranscriptModal } from "@/components/modals/YoutubeTranscriptModal";
-import { checkIsPaidUser } from "@/plusUtils";
 import type CopilotPlugin from "@/main";
-import { MiyoRequestError } from "@/miyo/MiyoClient";
-import { requestMiyoIndexRefresh } from "@/miyo/miyoIndex";
-import { getMiyoCustomUrl } from "@/miyo/miyoUtils";
 import { getAllQAMarkdownContent } from "@/search/searchUtils";
-import { getSettings } from "@/settings/model";
 import { NoteSelectedTextContext, WebSelectedTextContext } from "@/types/message";
 import { isSourceModeOn } from "@/utils";
 import { isDesktopRuntime } from "@/utils/desktopRuntime";
@@ -32,8 +26,6 @@ import { Editor, MarkdownView, Notice, TFile } from "obsidian";
 import { v4 as uuidv4 } from "uuid";
 import { COMMAND_IDS, COMMAND_ICONS, COMMAND_NAMES, CommandId } from "@/constants";
 import { setSelectedTextContexts } from "@/aiParams";
-
-type PublishFile = (file: TFile) => void;
 
 function addCommand(plugin: CopilotPlugin, id: CommandId, callback: () => void | Promise<void>) {
   plugin.addCommand({
@@ -80,19 +72,7 @@ function addCheckCommand(
   });
 }
 
-export function registerCommands(plugin: CopilotPlugin, publish: PublishFile) {
-  addCheckCommand(plugin, COMMAND_IDS.PUBLISH_FILE_TO_OPENARTIFACTS, (checking) => {
-    const activeFile = plugin.app.workspace.getActiveFile();
-    if (!(activeFile instanceof TFile) || activeFile.extension !== "md") {
-      return false;
-    }
-
-    if (!checking) {
-      publish(activeFile);
-    }
-    return true;
-  });
-
+export function registerCommands(plugin: CopilotPlugin) {
   addEditorCommand(plugin, COMMAND_IDS.COUNT_WORD_AND_TOKENS_SELECTION, async (editor: Editor) => {
     const selectedText = editor.getSelection();
     const wordCount = selectedText.split(" ").length;
@@ -131,18 +111,6 @@ export function registerCommands(plugin: CopilotPlugin, publish: PublishFile) {
     clearRecordedPromptPayload();
     await plugin.newChat();
   });
-
-  if (isDesktopRuntime()) {
-    addCommand(plugin, COMMAND_IDS.OPEN_AGENT_CHAT_WINDOW, () => {
-      void plugin.activateAgentView();
-    });
-    addCommand(plugin, COMMAND_IDS.TOGGLE_AGENT_CHAT_WINDOW, () => {
-      void plugin.toggleAgentView();
-    });
-    addCommand(plugin, COMMAND_IDS.NEW_AGENT_CHAT, () => {
-      void plugin.newAgentChat();
-    });
-  }
 
   addCheckCommand(plugin, COMMAND_IDS.TRIGGER_QUICK_COMMAND, (checking: boolean) => {
     const activeView = plugin.app.workspace.getActiveViewOfType(MarkdownView);
@@ -197,38 +165,6 @@ export function registerCommands(plugin: CopilotPlugin, publish: PublishFile) {
 
     return true;
   });
-
-  // The palette reflects connection intent at plugin load. Reachability is
-  // checked when the command runs so a stopped or remote Miyo fails visibly.
-  // https://github.com/Brevilabs/obsidian-copilot-private/issues/282
-  if (getSettings().enableMiyo) {
-    addCommand(plugin, COMMAND_IDS.REFRESH_MIYO_INDEX, async () => {
-      const settings = getSettings();
-      if (!settings.enableMiyo) {
-        new Notice("Miyo is disconnected. Connect it in Copilot settings, then retry.");
-        return;
-      }
-      const customUrl = getMiyoCustomUrl(settings);
-      // Mobile cannot discover a service on localhost, so this state needs a
-      // concrete recovery action instead of the generic unavailable message.
-      // https://github.com/Brevilabs/obsidian-copilot-private/issues/282
-      if (!isDesktopRuntime() && !customUrl) {
-        new Notice("A remote Miyo connection is required on mobile.");
-        return;
-      }
-      try {
-        await requestMiyoIndexRefresh(plugin.app);
-        new Notice("Miyo vault scan started. Open Miyo to check indexing progress.");
-      } catch (error) {
-        logError("Failed to refresh the Miyo index:", error);
-        if (error instanceof MiyoRequestError && error.status === 404) {
-          new Notice("This vault is not registered with Miyo. Register it in Miyo, then retry.");
-          return;
-        }
-        new Notice("Miyo is unavailable. Open Miyo, then retry the refresh.");
-      }
-    });
-  }
 
   addCommand(plugin, COMMAND_IDS.LOAD_COPILOT_CHAT_CONVERSATION, async () => {
     await plugin.loadCopilotChatHistory();
@@ -371,17 +307,6 @@ export function registerCommands(plugin: CopilotPlugin, publish: PublishFile) {
 
   addCommand(plugin, COMMAND_IDS.APPLY_CUSTOM_COMMAND, () => {
     const modal = new ApplyCustomCommandModal(plugin.app);
-    modal.open();
-  });
-
-  addCommand(plugin, COMMAND_IDS.DOWNLOAD_YOUTUBE_SCRIPT, async () => {
-    const isPaidUser = await checkIsPaidUser(plugin.app, { trigger: "tool_call" });
-    if (!isPaidUser) {
-      new Notice("Download YouTube Script (plus) is a Copilot Plus feature");
-      return;
-    }
-
-    const modal = new YoutubeTranscriptModal(plugin.app);
     modal.open();
   });
 

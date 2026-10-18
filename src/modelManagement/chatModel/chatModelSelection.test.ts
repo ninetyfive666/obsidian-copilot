@@ -83,19 +83,19 @@ describe("chatModelSelection", () => {
       const target = entry("a", "gpt-4o", provider("p1"));
 
       expect(isChatModelSelectionForEntry(target, "a")).toBe(true);
-      expect(isChatModelSelectionForEntry(target, `gpt-4o|${ChatModelProviders.OPENAI}`)).toBe(
-        true
-      );
+      expect(
+        isChatModelSelectionForEntry(target, `gpt-4o|${ChatModelProviders.OPENAI_FORMAT}`)
+      ).toBe(true);
     });
 
     it("rejects a selection that names a different model or provider", () => {
       const target = entry("a", "gpt-4o", provider("p1"));
 
       expect(isChatModelSelectionForEntry(target, "b")).toBe(false);
-      expect(isChatModelSelectionForEntry(target, `gpt-5|${ChatModelProviders.OPENAI}`)).toBe(
-        false
-      );
-      expect(isChatModelSelectionForEntry(target, `gpt-4o|${ChatModelProviders.ANTHROPIC}`)).toBe(
+      expect(
+        isChatModelSelectionForEntry(target, `gpt-5|${ChatModelProviders.OPENAI_FORMAT}`)
+      ).toBe(false);
+      expect(isChatModelSelectionForEntry(target, `gpt-4o|${ChatModelProviders.OLLAMA}`)).toBe(
         false
       );
     });
@@ -113,25 +113,27 @@ describe("chatModelSelection", () => {
       const p = provider("p1");
       const target = entry("a", "gpt-4o", p);
 
-      expect(resolveChatModelSelectionId([target], `gpt-4o|${ChatModelProviders.OPENAI}`)).toBe(
-        "a"
-      );
+      expect(
+        resolveChatModelSelectionId([target], `gpt-4o|${ChatModelProviders.OPENAI_FORMAT}`)
+      ).toBe("a");
     });
 
-    it("maps a legacy Copilot Plus key to the Plus configured model", () => {
-      const plus = provider("plus", {
-        origin: { kind: "copilot-plus" },
+    it("maps a legacy LM Studio preset key to the configured model", () => {
+      const lmstudio = provider("lmstudio", {
+        displayName: "LM Studio",
+        baseUrl: "http://localhost:1234/v1",
+        origin: { kind: "byok", catalogProviderId: "lmstudio" },
         requiresApiKey: false,
       });
       const byok = entry("byok", "gpt-4o", provider("p1"));
-      const plusEntry = entry("plus-model", "copilot-plus-flash", plus);
+      const lmstudioEntry = entry("lm-model", "mistral-7b", lmstudio);
 
       expect(
         resolveChatModelSelectionId(
-          [byok, plusEntry],
-          `copilot-plus-flash|${ChatModelProviders.COPILOT_PLUS}`
+          [byok, lmstudioEntry],
+          `mistral-7b|${ChatModelProviders.LM_STUDIO}`
         )
-      ).toBe("plus-model");
+      ).toBe("lm-model");
     });
 
     it("maps a legacy local-provider key to the migrated openai-compatible model", () => {
@@ -150,18 +152,19 @@ describe("chatModelSelection", () => {
       ).toBe("ollama-model");
     });
 
-    it("maps a legacy xAI key when the endpoint is a custom OpenAI-format URL", () => {
-      const xai = provider("xai", {
-        baseUrl: "https://proxy.example.com/v1",
-        origin: { kind: "byok", catalogProviderId: "xai" },
+    it("maps a legacy custom-endpoint key when the endpoint speaks the OpenAI format", () => {
+      const custom = provider("custom", {
+        displayName: "My llama.cpp",
+        baseUrl: "http://localhost:8080/v1",
+        origin: { kind: "byok" },
       });
 
       expect(
         resolveChatModelSelectionId(
-          [entry("xai-model", "grok-4", xai)],
-          `grok-4|${ChatModelProviders.XAI}`
+          [entry("custom-model", "qwen2.5", custom)],
+          `qwen2.5|${ChatModelProviders.OPENAI_FORMAT}`
         )
-      ).toBe("xai-model");
+      ).toBe("custom-model");
     });
 
     it("falls back to the first usable entry when the selection matches nothing", () => {

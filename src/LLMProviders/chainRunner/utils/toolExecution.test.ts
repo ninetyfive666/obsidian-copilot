@@ -1,7 +1,6 @@
 import { createLangChainTool } from "@/tools/createLangChainTool";
 import { ToolRegistry, type ToolMetadata } from "@/tools/ToolRegistry";
 import { logInfo } from "@/logger";
-import { checkIsPaidUser, isSelfHostModeValid } from "@/plusUtils";
 import { z } from "zod";
 import {
   deduplicateSources,
@@ -12,15 +11,6 @@ import {
 } from "./toolExecution";
 
 jest.mock("@/logger");
-jest.mock("@/plusUtils", () => ({
-  checkIsPaidUser: jest.fn(),
-  isSelfHostModeValid: jest.fn().mockReturnValue(false),
-}));
-
-const mockCheckIsPaidUser = checkIsPaidUser as jest.MockedFunction<typeof checkIsPaidUser>;
-const mockIsSelfHostModeValid = isSelfHostModeValid as jest.MockedFunction<
-  typeof isSelfHostModeValid
->;
 
 function registerTool<T extends ReturnType<typeof createLangChainTool>>(
   tool: T,
@@ -42,7 +32,6 @@ function registerTool<T extends ReturnType<typeof createLangChainTool>>(
 describe("toolExecution", () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    mockIsSelfHostModeValid.mockReturnValue(false);
     ToolRegistry.getInstance().clear();
   });
 
@@ -62,7 +51,6 @@ describe("toolExecution", () => {
       ]);
 
       expect(result).toEqual({ toolName: "echo", result: "Result: test", success: true });
-      expect(mockCheckIsPaidUser).not.toHaveBeenCalled();
     });
 
     it("hands the original user message to a tool that requires it", async () => {
@@ -140,69 +128,6 @@ describe("toolExecution", () => {
 
       expect(result.success).toBe(false);
       expect(result.result).toMatch(/^Error: /);
-    });
-
-    it("blocks a plus-only tool for a non-plus user without running it", async () => {
-      const func = jest.fn().mockResolvedValue("Should not execute");
-      const plusTool = registerTool(
-        createLangChainTool({
-          name: "plusTool",
-          description: "Plus-only tool",
-          schema: z.object({}),
-          func,
-        }),
-        { isPlusOnly: true }
-      );
-      mockCheckIsPaidUser.mockResolvedValueOnce(false);
-
-      const result = await executeSequentialToolCall({ name: "plusTool", args: {} }, [plusTool]);
-
-      expect(result).toEqual({
-        toolName: "plusTool",
-        result: "Error: plusTool requires a Copilot Plus subscription",
-        success: false,
-      });
-      expect(mockCheckIsPaidUser).toHaveBeenCalledWith(undefined, { trigger: "tool_call" });
-      expect(func).not.toHaveBeenCalled();
-    });
-
-    it("runs a plus-only tool for a plus user", async () => {
-      const plusTool = registerTool(
-        createLangChainTool({
-          name: "plusTool",
-          description: "Plus-only tool",
-          schema: z.object({}),
-          func: async () => "Plus tool executed",
-        }),
-        { isPlusOnly: true }
-      );
-      mockCheckIsPaidUser.mockResolvedValueOnce(true);
-
-      const result = await executeSequentialToolCall({ name: "plusTool", args: {} }, [plusTool]);
-
-      expect(result).toEqual({
-        toolName: "plusTool",
-        result: "Plus tool executed",
-        success: true,
-      });
-    });
-
-    it("runs a plus-only tool for a non-plus user in a valid self-host setup", async () => {
-      const plusTool = registerTool(
-        createLangChainTool({
-          name: "plusTool",
-          description: "Plus-only tool",
-          schema: z.object({}),
-          func: async () => "Plus tool executed",
-        }),
-        { isPlusOnly: true }
-      );
-      mockCheckIsPaidUser.mockResolvedValueOnce(false);
-      mockIsSelfHostModeValid.mockReturnValue(true);
-
-      const result = await executeSequentialToolCall({ name: "plusTool", args: {} }, [plusTool]);
-
-      expect(result.success).toBe(true);
     });
 
     it("lists the available tools when the named tool is not found", async () => {

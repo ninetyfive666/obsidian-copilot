@@ -8,26 +8,16 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ModelDisplay } from "@/components/ui/model-display";
-import { LicenseRequiredIcon } from "@/components/ui/LicenseRequiredIcon";
-import { createProductUrl, PRODUCT_URLS } from "@/lib/productLinks";
-import { SelfHostCloudWarningIcon } from "@/components/ui/SelfHostCloudWarningIcon";
-import { checkModelApiKey, err2String } from "@/lib/model-display-utils";
-import type { ModelApiKeySettings } from "@/lib/model-display-utils";
+import { err2String } from "@/lib/model-display-utils";
 import { getModelKeyFromModel } from "@/lib/model-key";
 import type { CustomModel } from "@/aiParams";
 import { ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-const PICKER_PRICING_URL = createProductUrl(PRODUCT_URLS.COPILOT_PRICING, "model_picker_lock");
-
 export type ModelSelectorEntry = CustomModel & {
   _disabledReason?: string;
   _group?: string;
-  _backendId?: string;
   _subtitle?: string;
-  _isFree?: boolean;
-  _needsSelfHostWarning?: boolean;
-  _needsLicense?: boolean;
 };
 
 interface ModelSelectorProps {
@@ -38,7 +28,6 @@ interface ModelSelectorProps {
   value: string;
   onChange: (modelKey: string) => void;
   models: ModelSelectorEntry[];
-  apiKeySettings?: Readonly<ModelApiKeySettings>;
 }
 
 export function ModelSelector({
@@ -49,7 +38,6 @@ export function ModelSelector({
   value,
   onChange,
   models,
-  apiKeySettings,
 }: ModelSelectorProps) {
   const [modelError, setModelError] = useState<string | null>(null);
 
@@ -78,9 +66,6 @@ export function ModelSelector({
               <span className="tw-truncate">Select Model</span>
             )}
           </div>
-          {currentModel?._needsSelfHostWarning && (
-            <SelfHostCloudWarningIcon className="tw-mt-0.5" stopPropagation={false} />
-          )}
           {!disabled && <ChevronDown className="tw-mt-0.5 tw-size-5 tw-shrink-0" />}
         </Button>
       </DropdownMenuTrigger>
@@ -88,13 +73,8 @@ export function ModelSelector({
       <DropdownMenuContent align="start" className="tw-max-h-64 tw-overflow-y-auto">
         {visible.map((model) => {
           const disabledReason = model._disabledReason;
-          const hasApiKey = apiKeySettings
-            ? checkModelApiKey(model, apiKeySettings).hasApiKey
-            : true;
-          const itemDisabled = Boolean(disabledReason) || !hasApiKey;
-          const rightLabel = model._needsLicense
-            ? null
-            : (disabledReason ?? (!hasApiKey ? "Needs API key" : null));
+          const itemDisabled = Boolean(disabledReason);
+          const rightLabel = disabledReason ?? null;
           const showHeader = model._group !== undefined && model._group !== lastGroup;
           const headerKey = `__group__${model._group}__${getModelKeyFromModel(model)}`;
           lastGroup = model._group;
@@ -109,17 +89,9 @@ export function ModelSelector({
                 </DropdownMenuLabel>
               )}
               <DropdownMenuItem
-                disabled={itemDisabled && !model._needsLicense}
+                disabled={itemDisabled}
                 title={disabledReason ?? undefined}
                 onSelect={(event) => {
-                  if (model._needsLicense) {
-                    (event.currentTarget as HTMLElement).win.open(
-                      PICKER_PRICING_URL,
-                      "_blank",
-                      "noopener,noreferrer"
-                    );
-                    return;
-                  }
                   if (itemDisabled) {
                     event.preventDefault();
                     return;
@@ -139,16 +111,11 @@ export function ModelSelector({
                     }
                   }
                 }}
-                className={cn(
-                  itemDisabled && "tw-opacity-50",
-                  itemDisabled && !model._needsLicense && "tw-cursor-not-allowed"
-                )}
+                className={cn(itemDisabled && "tw-cursor-not-allowed tw-opacity-50")}
               >
                 <div className="tw-min-w-0">
                   <div className="tw-flex tw-min-w-0 tw-items-center tw-gap-1">
                     <ModelDisplay model={model} iconSize={12} />
-                    {model._needsLicense && <LicenseRequiredIcon />}
-                    {model._needsSelfHostWarning && <SelfHostCloudWarningIcon />}
                   </div>
                   {model._subtitle && (
                     <div className="tw-truncate tw-text-xs tw-text-muted">{model._subtitle}</div>

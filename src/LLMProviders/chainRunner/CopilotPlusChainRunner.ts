@@ -14,7 +14,6 @@ import {
   MessageContent,
 } from "@/imageProcessing/imageProcessor";
 import { logInfo, logWarn } from "@/logger";
-import { checkIsPaidUser } from "@/plusUtils";
 import { getSettings } from "@/settings/model";
 import {
   getEffectiveUserPrompt,
@@ -25,9 +24,9 @@ import { ToolManager } from "@/tools/toolManager";
 import { ToolResultFormatter } from "@/tools/ToolResultFormatter";
 import { ToolRegistry } from "@/tools/ToolRegistry";
 import { initializeBuiltinTools } from "@/tools/builtinTools";
-import { createLocalSearchTool, webSearchTool } from "@/tools/SearchTools";
+import { createLocalSearchTool } from "@/tools/SearchTools";
 import { createUpdateMemoryTool } from "@/tools/memoryTools";
-import { err2String, extractChatHistory } from "@/utils";
+import { err2String } from "@/utils";
 import { ChatMessage, ResponseMetadata } from "@/types/message";
 import { getApiErrorMessage, getMessageRole, withSuppressedTokenWarnings } from "@/utils";
 import { BaseChatModel } from "@langchain/core/language_models/chat_models";
@@ -237,23 +236,6 @@ Include your extracted terms as: [SALIENT_TERMS: term1, term2, term3]`;
             query: cleanQuery,
             salientTerms: context.salientTerms,
             timeRange: context.timeRange,
-          },
-        });
-      }
-    }
-
-    if (message.includes("@websearch") || message.includes("@web")) {
-      const hasWebSearch = toolCalls.some((tc) => tc.tool.name === "webSearch");
-      if (!hasWebSearch) {
-        const memory = ChainOwner.instance.getCurrentChainManager().memoryManager.getMemory();
-        const memoryVariables = await memory.loadMemoryVariables({});
-        const chatHistory = extractChatHistory(memoryVariables);
-
-        toolCalls.push({
-          tool: webSearchTool,
-          args: {
-            query: cleanQuery,
-            chatHistory,
           },
         });
       }
@@ -646,25 +628,6 @@ Include your extracted terms as: [SALIENT_TERMS: term1, term2, term3]`;
     const thinkStreamer = new ThinkBlockStreamer(updateCurrentAiMessage, excludeThinking);
     let sources: { title: string; path: string; score: number; explanation?: unknown }[] = [];
 
-    const isPaidUser = await checkIsPaidUser(this.chainManager.app, {
-      trigger: "legacy_chat_turn",
-      isCopilotPlus: true,
-    });
-    if (!isPaidUser) {
-      await this.handleError(new Error("Invalid license key"), (message) =>
-        thinkStreamer.processErrorChunk(message)
-      );
-      const errorResponse = thinkStreamer.close().content;
-
-      return this.handleResponse(
-        errorResponse,
-        userMessage,
-        abortController,
-        addMessage,
-        updateCurrentAiMessage,
-        undefined
-      );
-    }
 
     try {
       logInfo("==== Step 1: Planning tools ====");
@@ -859,8 +822,6 @@ Include your extracted terms as: [SALIENT_TERMS: term1, term2, term3]`;
       logInfo(`Step 2: Calling tool: ${toolCall.tool.name}`);
       if (toolCall.tool.name === "localSearch") {
         updateLoadingMessage?.(LOADING_MESSAGES.READING_FILES);
-      } else if (toolCall.tool.name === "webSearch") {
-        updateLoadingMessage?.(LOADING_MESSAGES.SEARCHING_WEB);
       } else if (toolCall.tool.name === "getFileTree") {
         updateLoadingMessage?.(LOADING_MESSAGES.READING_FILE_TREE);
       }

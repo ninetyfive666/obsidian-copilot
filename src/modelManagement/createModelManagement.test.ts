@@ -30,7 +30,7 @@ describe("createModelManagement", () => {
     it("wires a coordinator that removes a provider from the shared registries", async () => {
       const api = createModelManagement({ app });
       const providerId = await api.providerRegistry.add({
-        providerType: "anthropic",
+        providerType: "openai-compatible",
         displayName: "Anthropic",
         origin: { kind: "byok" },
       });
@@ -52,7 +52,7 @@ describe("createModelManagement", () => {
     describe("removeProvider()", () => {
       it("removes the provider, its models, their backend refs, and its stored API key", async () => {
         const providerId = await providers.add({
-          providerType: "anthropic",
+          providerType: "openai-compatible",
           displayName: "Anthropic",
           origin: { kind: "byok" },
         });
@@ -66,25 +66,23 @@ describe("createModelManagement", () => {
           info: { id: "claude-opus-4-5", displayName: "Opus" },
         });
         await backends.setEnabledModels("chat", [id1, id2]);
-        await backends.setEnabledModels("opencode", [id2]);
 
         await coordinator.removeProvider(providerId);
 
         expect(providers.get(providerId)).toBeUndefined();
         expect(models.listByProvider(providerId)).toHaveLength(0);
         expect(backends.get("chat").enabledModels).toEqual([]);
-        expect(backends.get("opencode").enabledModels).toEqual([]);
         expect(await providers.getApiKey(providerId)).toBeNull();
       });
 
       it("keeps other providers, their models, and their backend refs", async () => {
         const idA = await providers.add({
-          providerType: "anthropic",
+          providerType: "openai-compatible",
           displayName: "A",
           origin: { kind: "byok" },
         });
         const idB = await providers.add({
-          providerType: "anthropic",
+          providerType: "openai-compatible",
           displayName: "B",
           origin: { kind: "byok" },
         });
@@ -107,7 +105,7 @@ describe("createModelManagement", () => {
 
       it("removes a provider that has no configured models without touching backends", async () => {
         const providerId = await providers.add({
-          providerType: "google",
+          providerType: "openai-compatible",
           displayName: "Empty",
           origin: { kind: "byok" },
         });
@@ -120,7 +118,7 @@ describe("createModelManagement", () => {
     describe("removeConfiguredModel()", () => {
       it("removes the model and its refs from every backend while keeping the provider and sibling models", async () => {
         const providerId = await providers.add({
-          providerType: "anthropic",
+          providerType: "openai-compatible",
           displayName: "Anthropic",
           origin: { kind: "byok" },
         });
@@ -133,20 +131,18 @@ describe("createModelManagement", () => {
           info: { id: "claude-opus-4-5", displayName: "Opus" },
         });
         await backends.setEnabledModels("chat", [id1, id2]);
-        await backends.setEnabledModels("opencode", [id1]);
 
         await coordinator.removeConfiguredModel(id1);
 
         expect(models.get(id1)).toBeUndefined();
         expect(models.get(id2)).toBeDefined();
         expect(backends.get("chat").enabledModels).toEqual([id2]);
-        expect(backends.get("opencode").enabledModels).toEqual([]);
         expect(providers.get(providerId)).toBeDefined();
       });
 
       it("changes nothing when the model id does not exist", async () => {
         const providerId = await providers.add({
-          providerType: "google",
+          providerType: "openai-compatible",
           displayName: "G",
           origin: { kind: "byok" },
         });

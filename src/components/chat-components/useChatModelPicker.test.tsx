@@ -34,7 +34,6 @@ jest.mock("@/settings/model", () => ({
   getModelKeyFromModel: (model: { name: string; provider: string }) =>
     `${model.name}|${model.provider}`,
 }));
-jest.mock("@/lib/lockedCopilotEntries", () => ({ shouldPreviewCopilotModels: () => false }));
 describe("useChatModelPicker", () => {
   describe("useChatModelPicker()", () => {
     it("shows the explicitly selected legacy model and returns configured IDs on selection", () => {

@@ -1,40 +1,12 @@
 import { ReactModal } from "@/components/modals/ReactModal";
 import { SearchBar } from "@/components/ui/SearchBar";
 import { cn } from "@/lib/utils";
-import type { CatalogProvider, ProviderType } from "@/modelManagement/types/catalog";
 import type { ProviderDefinition } from "@/modelManagement/types/runtime";
 import { Plus } from "lucide-react";
 import { App } from "obsidian";
-import React, { useMemo, useState } from "react";
-
-const RECOMMENDED_IDS: readonly string[] = ["anthropic", "openai", "google"];
-
-const RECOMMENDED_DESCRIPTIONS: Record<string, string> = {
-  anthropic: "Claude family",
-  openai: "GPT family",
-  google: "Gemini family",
-};
-
-const PROVIDER_TYPE_HINTS: Record<ProviderType, string> = {
-  anthropic: "e.g. claude-sonnet-5",
-  google: "e.g. gemini-2.5-pro",
-  "openai-compatible": "e.g. gpt-5",
-};
-
-function catalogToDefinition(catalog: CatalogProvider): ProviderDefinition {
-  return {
-    id: catalog.id,
-    displayName: catalog.displayName,
-    providerType: catalog.providerType,
-    defaultBaseUrl: catalog.defaultBaseUrl,
-    requiresApiKey: true,
-    modelInputHint: PROVIDER_TYPE_HINTS[catalog.providerType] ?? "Add a model id",
-    catalogProviderId: catalog.id,
-  };
-}
+import React, { useState } from "react";
 
 export interface AddProviderContentProps {
-  catalogProviders: readonly CatalogProvider[];
   localTemplates: readonly ProviderDefinition[];
   customTemplate: ProviderDefinition;
   onPick: (source: ProviderDefinition) => void;
@@ -47,26 +19,13 @@ function matchesQuery(item: { displayName: string }, query: string): boolean {
 }
 
 export const AddProviderContent: React.FC<AddProviderContentProps> = ({
-  catalogProviders,
   localTemplates,
   customTemplate,
   onPick,
 }) => {
   const [query, setQuery] = useState("");
 
-  const { recommended, local, more } = useMemo(() => {
-    const byId = new Map(catalogProviders.map((p) => [p.id, p]));
-    const recommended = RECOMMENDED_IDS.map((id) => byId.get(id)).filter(
-      (p): p is CatalogProvider => p !== undefined && matchesQuery(p, query)
-    );
-    const local = localTemplates.filter((t) => matchesQuery(t, query));
-    const more = catalogProviders
-      .filter((p) => !RECOMMENDED_IDS.includes(p.id) && matchesQuery(p, query))
-      .sort((a, b) => a.displayName.localeCompare(b.displayName));
-    return { recommended, local, more };
-  }, [catalogProviders, localTemplates, query]);
-
-  const noMatches = recommended.length === 0 && local.length === 0 && more.length === 0;
+  const local = localTemplates.filter((t) => matchesQuery(t, query));
 
   return (
     <div className="tw-flex tw-h-full tw-min-h-0 tw-flex-col tw-gap-4 tw-overflow-hidden tw-px-2">
@@ -75,28 +34,10 @@ export const AddProviderContent: React.FC<AddProviderContentProps> = ({
       <SearchBar value={query} onChange={setQuery} placeholder="Search providers…" />
 
       <div className="tw-flex tw-min-h-0 tw-flex-1 tw-flex-col tw-gap-4 tw-overflow-y-auto">
-        {recommended.length > 0 && (
-          <section data-testid="add-provider-recommended">
-            <div className="tw-mb-2 tw-text-ui-smaller tw-font-medium tw-uppercase tw-tracking-wide tw-text-muted">
-              Recommended
-            </div>
-            <div className="tw-flex tw-flex-col tw-gap-0.5">
-              {recommended.map((p) => (
-                <ProviderRow
-                  key={p.id}
-                  provider={p}
-                  description={RECOMMENDED_DESCRIPTIONS[p.id]}
-                  onClick={() => onPick(catalogToDefinition(p))}
-                />
-              ))}
-            </div>
-          </section>
-        )}
-
         {local.length > 0 && (
           <section data-testid="add-provider-local">
             <div className="tw-mb-2 tw-text-ui-smaller tw-font-medium tw-uppercase tw-tracking-wide tw-text-muted">
-              Self Host
+              Local Providers
             </div>
             <div className="tw-flex tw-flex-col tw-gap-0.5">
               {local.map((t) => (
@@ -106,24 +47,7 @@ export const AddProviderContent: React.FC<AddProviderContentProps> = ({
           </section>
         )}
 
-        {more.length > 0 && (
-          <section data-testid="add-provider-more">
-            <div className="tw-mb-2 tw-text-ui-smaller tw-font-medium tw-uppercase tw-tracking-wide tw-text-muted">
-              More providers
-            </div>
-            <div className="tw-flex tw-flex-col tw-gap-0.5">
-              {more.map((p) => (
-                <ProviderRow
-                  key={p.id}
-                  provider={p}
-                  onClick={() => onPick(catalogToDefinition(p))}
-                />
-              ))}
-            </div>
-          </section>
-        )}
-
-        {noMatches && (
+        {local.length === 0 && (
           <div className="tw-rounded-md tw-border tw-border-dashed tw-border-border tw-px-4 tw-py-6 tw-text-center tw-text-sm tw-text-muted">
             No providers match your search.
           </div>
@@ -199,29 +123,6 @@ const TemplateRow: React.FC<TemplateRowProps> = ({ template, onClick }) => {
   );
 };
 
-interface ProviderRowProps {
-  provider: CatalogProvider;
-  onClick: () => void;
-  description?: string;
-}
-
-const ProviderRow: React.FC<ProviderRowProps> = ({ provider, onClick, description }) => (
-  <KeyboardButton
-    onClick={onClick}
-    testId={`add-provider-card-${provider.id}`}
-    ariaLabel={`Add ${provider.displayName} provider`}
-    className={ROW_CLASS}
-  >
-    <span className="tw-flex tw-min-w-0 tw-flex-1 tw-items-baseline tw-gap-1.5 tw-truncate">
-      <span className="tw-truncate tw-text-sm tw-text-normal">{provider.displayName}</span>
-      {description && (
-        <span className="tw-truncate tw-text-ui-smaller tw-text-muted">— {description}</span>
-      )}
-    </span>
-    <Plus className="tw-size-4 tw-shrink-0 tw-text-muted" />
-  </KeyboardButton>
-);
-
 const CustomProviderCta: React.FC<{ onClick: () => void }> = ({ onClick }) => (
   <KeyboardButton
     onClick={onClick}
@@ -239,7 +140,6 @@ const CustomProviderCta: React.FC<{ onClick: () => void }> = ({ onClick }) => (
 );
 
 interface AddProviderModalOptions {
-  catalogProviders: readonly CatalogProvider[];
   localTemplates: readonly ProviderDefinition[];
   customTemplate: ProviderDefinition;
   onPick: (source: ProviderDefinition) => void;
@@ -268,7 +168,6 @@ export class AddProviderModal extends ReactModal {
   protected renderContent(close: () => void): React.ReactElement {
     return (
       <AddProviderContent
-        catalogProviders={this.opts.catalogProviders}
         localTemplates={this.opts.localTemplates}
         customTemplate={this.opts.customTemplate}
         onPick={(source) => {

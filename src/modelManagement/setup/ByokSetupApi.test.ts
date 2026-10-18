@@ -12,15 +12,14 @@ jest.mock("@/logger", () => ({
   logError: jest.fn(),
 }));
 
-const ANTHROPIC_CATALOG: CatalogProvider = {
-  id: "anthropic",
-  displayName: "Anthropic",
-  defaultBaseUrl: "https://api.anthropic.com/v1",
-  providerType: "anthropic",
+const OLLAMA_CATALOG: CatalogProvider = {
+  id: "ollama",
+  displayName: "Ollama",
+  defaultBaseUrl: "http://localhost:11434/v1",
+  providerType: "openai-compatible",
   models: {
-    "claude-sonnet-4-5": { id: "claude-sonnet-4-5", displayName: "Claude Sonnet 4.5" },
-    "claude-opus-4-5": { id: "claude-opus-4-5", displayName: "Claude Opus 4.5" },
-    "claude-haiku-4-5": { id: "claude-haiku-4-5", displayName: "Claude Haiku 4.5" },
+    "llama3.1:8b": { id: "llama3.1:8b", displayName: "Llama 3.1 8B" },
+    "qwen2.5:7b": { id: "qwen2.5:7b", displayName: "Qwen 2.5 7B" },
   },
 };
 
@@ -38,29 +37,29 @@ describe("ByokSetupApi", () => {
   describe("setupProvider()", () => {
     it("creates a catalog-linked BYOK provider with its key and models and enrolls the models into the default backends", async () => {
       const result = await api.setupProvider({
-        catalogProviderId: "anthropic",
-        providerType: "anthropic",
-        displayName: "My Anthropic",
-        baseUrl: "https://api.anthropic.com/v1",
-        apiKey: "sk-ant",
+        catalogProviderId: "ollama",
+        providerType: "openai-compatible",
+        displayName: "My Ollama",
+        baseUrl: "http://localhost:11434/v1",
+        apiKey: "key-123",
         models: [
-          ANTHROPIC_CATALOG.models["claude-sonnet-4-5"],
-          ANTHROPIC_CATALOG.models["claude-opus-4-5"],
+          OLLAMA_CATALOG.models["llama3.1:8b"],
+          OLLAMA_CATALOG.models["qwen2.5:7b"],
         ],
       });
 
       const provider = providers.get(result.providerId)!;
-      expect(provider.origin).toEqual({ kind: "byok", catalogProviderId: "anthropic" });
-      expect(provider.providerType).toBe("anthropic");
-      expect(provider.baseUrl).toBe("https://api.anthropic.com/v1");
-      expect(await providers.getApiKey(result.providerId)).toBe("sk-ant");
+      expect(provider.origin).toEqual({ kind: "byok", catalogProviderId: "ollama" });
+      expect(provider.providerType).toBe("openai-compatible");
+      expect(provider.baseUrl).toBe("http://localhost:11434/v1");
+      expect(await providers.getApiKey(result.providerId)).toBe("key-123");
 
       expect(
         models
           .listByProvider(result.providerId)
           .map((m) => m.info.id)
           .sort()
-      ).toEqual(["claude-opus-4-5", "claude-sonnet-4-5"]);
+      ).toEqual(["llama3.1:8b", "qwen2.5:7b"]);
 
       for (const backend of BYOK_DEFAULT_AUTO_ENROLL) {
         expect(backends.get(backend).enabledModels.sort()).toEqual(
@@ -122,11 +121,11 @@ describe("ByokSetupApi", () => {
 
       await expect(
         api.setupProvider({
-          catalogProviderId: "anthropic",
-          providerType: "anthropic",
-          displayName: "My Anthropic",
-          apiKey: "sk-ant",
-          models: [ANTHROPIC_CATALOG.models["claude-sonnet-4-5"]],
+          catalogProviderId: "ollama",
+          providerType: "openai-compatible",
+          displayName: "My Ollama",
+          apiKey: "key-123",
+          models: [OLLAMA_CATALOG.models["llama3.1:8b"]],
         })
       ).rejects.toThrow("keychain unavailable");
 
@@ -143,7 +142,6 @@ describe("ByokSetupApi", () => {
         autoEnrollIn: ["chat"],
       });
       expect(backends.get("chat").enabledModels).toEqual([...result.configuredModelIds]);
-      expect(backends.get("opencode").enabledModels).toEqual([]);
     });
   });
 });

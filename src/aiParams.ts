@@ -131,8 +131,6 @@ export interface CustomModel {
 
   enablePromptCaching?: boolean;
 
-  plusExclusive?: boolean;
-  believerExclusive?: boolean;
   capabilities?: ModelCapability[];
   displayName?: string;
 

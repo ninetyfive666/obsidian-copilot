@@ -1,33 +1,20 @@
-import { useChatRelevantNotes } from "@/hooks/useChatRelevantNotes";
 import { RelevantNoteRow } from "@/components/chat-components/ui/RelevantNoteRow";
 import { RelevantNotesPane } from "@/components/chat-components/ui/RelevantNotesPane";
 import { RelevantNotesToolbar } from "@/components/chat-components/ui/RelevantNotesToolbar";
 import { useRelevantNoteRowTransitions } from "@/components/chat-components/ui/useRelevantNoteRowTransitions";
-import { createProductUrl, PRODUCT_URLS } from "@/lib/productLinks";
 import { useApp } from "@/context";
 import { useActiveFile } from "@/hooks/useActiveFile";
 import { useLiveRelevantNotesRefresh } from "@/hooks/useLiveRelevantNotesRefresh";
 import { useReducedMotion } from "@/hooks/useReducedMotion";
 import { cn } from "@/lib/utils";
-import { logError, logWarn } from "@/logger";
-import {
-  getMiyoFolderName,
-  getMiyoCustomUrl,
-  MIYO_DEEPLINK_URL,
-  shouldUseMiyo,
-} from "@/miyo/miyoUtils";
-import { getMiyoConnectionMode } from "@/miyo/miyoRuntimePolicy";
-import { useMiyoStatus } from "@/miyo/useMiyoStatus";
+import { logError } from "@/logger";
 import {
   findRelevantNotes,
   isSameRelevantNotesResult,
   type RelevantNoteEntry,
 } from "@/search/findRelevantNotes";
-import { onMiyoIndexChanged } from "@/miyo/miyoIndex";
-import { openCopilotSettings } from "@/settings/openSettings";
 import { updateSetting, useSettingsValue } from "@/settings/model";
-import { sha256 } from "@/utils/hash";
-import { Platform, TFile } from "obsidian";
+import { TFile } from "obsidian";
 import React, { memo, useCallback, useEffect, useRef, useState } from "react";
 
 const EMPTY_RELEVANT_NOTES: readonly RelevantNoteEntry[] = Object.freeze([]);
@@ -36,32 +23,20 @@ const IDLE_RELEVANT_NOTES_RESULT = Object.freeze({
   status: "idle" as const,
   details: undefined,
 });
-const DISABLED_RELEVANT_NOTES_RESULT = Object.freeze({
-  notes: EMPTY_RELEVANT_NOTES,
-  status: "disabled" as const,
-  details: undefined,
-});
 const LOADING_RELEVANT_NOTES_RESULT = Object.freeze({
   notes: EMPTY_RELEVANT_NOTES,
   status: "loading" as const,
   details: undefined,
 });
-const UNAVAILABLE_RELEVANT_NOTES_RESULT = Object.freeze({
-  notes: EMPTY_RELEVANT_NOTES,
-  status: "unavailable" as const,
-  details: undefined,
-});
 
 type RelevantNotesViewResult =
   | typeof IDLE_RELEVANT_NOTES_RESULT
-  | typeof DISABLED_RELEVANT_NOTES_RESULT
   | typeof LOADING_RELEVANT_NOTES_RESULT
-  | typeof UNAVAILABLE_RELEVANT_NOTES_RESULT
   | Awaited<ReturnType<typeof findRelevantNotes>>;
 
 interface SettledRelevantNotesRequest {
   requestKey: string;
-  result: Awaited<ReturnType<typeof findRelevantNotes>> | typeof UNAVAILABLE_RELEVANT_NOTES_RESULT;
+  result: Awaited<ReturnType<typeof findRelevantNotes>>;
 }
 
 function nextSettledRequest(
@@ -83,23 +58,7 @@ interface RelevantNotesRequery {
 
 const INITIAL_REQUERY: RelevantNotesRequery = Object.freeze({ restart: 0, live: false });
 
-interface UseRelevantNotesOptions {
-  paused?: boolean;
-  enableMiyo: boolean;
-  miyoServerUrl: string;
-  miyoBackendAvailable: boolean;
-  miyoCredentialIdentity: string;
-  liveUpdateEnabled: boolean;
-}
-
-function useRelevantNotes({
-  paused,
-  enableMiyo,
-  miyoServerUrl,
-  miyoBackendAvailable,
-  miyoCredentialIdentity,
-  liveUpdateEnabled,
-}: UseRelevantNotesOptions) {
+function useRelevantNotes(paused: boolean, liveUpdateEnabled: boolean) {
   const app = useApp();
   const [settledRequest, setSettledRequest] = useState<SettledRelevantNotesRequest | null>(null);
   const [requery, setRequery] = useState<RelevantNotesRequery>(INITIAL_REQUERY);
@@ -115,24 +74,14 @@ function useRelevantNotes({
     []
   );
   const liveRefresh = useCallback(() => {
-    // A slow Miyo answer would leave two searches in flight and discard one, so skip the tick.
+    // A slow search would leave two queries in flight and discard one, so skip the tick.
     // https://github.com/Brevilabs/obsidian-copilot-private/issues/362
     if (searchOpenRef.current) return;
     setRequery((current) => ({ ...current, live: true }));
   }, []);
-  const requestStatus = !activeFilePath ? "idle" : enableMiyo ? "ready" : "disabled";
+  const requestStatus = !activeFilePath ? "idle" : "ready";
   const requestKey =
-    requestStatus === "ready"
-      ? JSON.stringify([
-          activeFilePath,
-          miyoServerUrl,
-          miyoBackendAvailable,
-          miyoCredentialIdentity,
-          requery.restart,
-        ])
-      : null;
-
-  useEffect(() => onMiyoIndexChanged(refresh), [refresh]);
+    requestStatus === "ready" ? JSON.stringify([activeFilePath, requery.restart]) : null;
 
   useEffect(() => {
     let cancelled = false;
@@ -159,12 +108,8 @@ function useRelevantNotes({
           );
       } catch (error) {
         if (!cancelled) {
-          logWarn("Failed to fetch relevant notes", error);
-          setSettledRequest((settled) =>
-            frozen(settled)
-              ? settled
-              : nextSettledRequest(settled, requestKey, UNAVAILABLE_RELEVANT_NOTES_RESULT)
-          );
+          logError("Failed to fetch relevant notes", error);
+          setSettledRequest(null);
         }
       } finally {
         searchOpenRef.current = false;
@@ -178,13 +123,11 @@ function useRelevantNotes({
   }, [app, activeFilePath, requestKey, requestStatus, requery]);
 
   const result: RelevantNotesViewResult =
-    requestStatus === "disabled"
-      ? DISABLED_RELEVANT_NOTES_RESULT
-      : requestStatus === "idle"
-        ? IDLE_RELEVANT_NOTES_RESULT
-        : settledRequest?.requestKey === requestKey
-          ? settledRequest.result
-          : LOADING_RELEVANT_NOTES_RESULT;
+    requestStatus === "idle"
+      ? IDLE_RELEVANT_NOTES_RESULT
+      : settledRequest?.requestKey === requestKey
+        ? settledRequest.result
+        : LOADING_RELEVANT_NOTES_RESULT;
 
   return { result, refresh, liveRefresh };
 }
@@ -199,53 +142,20 @@ export const RelevantNotes = memo(
     const app = useApp();
     const activeFile = useActiveFile();
     const settings = useSettingsValue();
-    const miyoBackendAvailable = useMiyoStatus().backend === "available";
-    // Hash the credential so request identity changes with it without storing the key in state.
-    // https://github.com/Brevilabs/obsidian-copilot-private/issues/280
-    const miyoCredentialIdentity = sha256(settings.plusLicenseKey);
-    // Mobile without a remote server cannot reach Miyo, so polling its index would only be refused.
-    // https://github.com/Brevilabs/obsidian-copilot-private/issues/362
-    const canFollowMiyoIndex = shouldUseMiyo(settings);
-    const liveUpdateEnabled = canFollowMiyoIndex && settings.relevantNotesLiveUpdate;
-    // Retry the selected chat when Miyo reconnects without requiring a draft edit.
-    // https://github.com/Brevilabs/obsidian-copilot-private/issues/383
-    const chat = useChatRelevantNotes(
-      app,
-      liveUpdateEnabled,
-      JSON.stringify([getMiyoCustomUrl(settings), miyoCredentialIdentity, miyoBackendAvailable])
-    );
-    const {
-      result: noteResult,
-      refresh: noteRefresh,
-      liveRefresh,
-    } = useRelevantNotes({
-      paused: !!chat.context,
-      enableMiyo: settings.enableMiyo,
-      miyoServerUrl: getMiyoCustomUrl(settings),
-      miyoBackendAvailable,
-      miyoCredentialIdentity,
-      liveUpdateEnabled: liveUpdateEnabled && !chat.context,
-    });
-    const result = chat.context ? chat.result : noteResult;
-    const refresh = chat.context ? chat.refresh : noteRefresh;
-    const activeFileName = chat.context
-      ? "Agent chat context"
-      : activeFile?.extension === "md"
-        ? activeFile.basename
-        : undefined;
+    const liveUpdateEnabled = settings.relevantNotesLiveUpdate;
+    const { result, refresh, liveRefresh } = useRelevantNotes(false, liveUpdateEnabled);
+    const activeFileName = activeFile?.extension === "md" ? activeFile.basename : undefined;
     const activeFilePath = activeFile?.extension === "md" ? activeFile.path : undefined;
     const animated = !useReducedMotion();
     const { rows, registerRow } = useRelevantNoteRowTransitions(
       result.notes,
-      // A different chat or editor owns a different list; retiring rows must not cross sources.
-      // https://github.com/Brevilabs/obsidian-copilot-private/issues/383
-      chat.context ? `chat:${chat.context.id}` : activeFilePath,
+      activeFilePath,
       animated
     );
 
     useLiveRelevantNotesRefresh({
       app,
-      enabled: liveUpdateEnabled && !chat.context,
+      enabled: liveUpdateEnabled,
       filePath: activeFilePath,
       onRefresh: liveRefresh,
     });
@@ -262,13 +172,6 @@ export const RelevantNotes = memo(
       if (file instanceof TFile) onAddToChat(file);
     };
 
-    // A local-app deeplink cannot configure a remote server; a saved remote address can remain while local is selected.
-    // https://github.com/Brevilabs/obsidian-copilot-private/issues/466
-    const canOpenMiyoApp = !Platform.isMobile && getMiyoConnectionMode(settings) === "local";
-    const miyoFolderUrl = `${MIYO_DEEPLINK_URL}open?tab=sources&folder=${encodeURIComponent(
-      getMiyoFolderName(app)
-    )}`;
-
     return (
       <div
         data-relevant-notes
@@ -276,20 +179,15 @@ export const RelevantNotes = memo(
       >
         <RelevantNotesToolbar
           activeFileName={activeFileName}
-          liveUpdate={
-            canFollowMiyoIndex
-              ? {
-                  enabled: settings.relevantNotesLiveUpdate,
-                  onChange: (enabled) => updateSetting("relevantNotesLiveUpdate", enabled),
-                }
-              : undefined
-          }
+          liveUpdate={{
+            enabled: settings.relevantNotesLiveUpdate,
+            onChange: (enabled) => updateSetting("relevantNotesLiveUpdate", enabled),
+          }}
         />
         <div className="tw-relative tw-min-h-0 tw-flex-1">
           <div className="tw-absolute tw-inset-0 tw-overflow-y-auto tw-p-2">
             <RelevantNotesPane
               status={result.status}
-              details={result.details}
               noteRows={rows.map((row) => (
                 <RelevantNoteRow
                   key={row.note.note.path}
@@ -302,22 +200,6 @@ export const RelevantNotes = memo(
                   onNavigateToNote={() => navigateToNote(row.note.note.path)}
                 />
               ))}
-              actions={{
-                miyoDownloadUrl: createProductUrl(PRODUCT_URLS.MIYO, "relevant_notes"),
-                onOpenMiyoSettings: (event) =>
-                  openCopilotSettings(app, event.currentTarget.win, "miyo"),
-                onRefresh: refresh,
-                reviewIndexing: {
-                  destination: canOpenMiyoApp ? "miyo" : "settings",
-                  onSelect: (event) => {
-                    if (canOpenMiyoApp) {
-                      event.currentTarget.win.open(miyoFolderUrl, "_blank");
-                    } else {
-                      openCopilotSettings(app, event.currentTarget.win, "miyo");
-                    }
-                  },
-                },
-              }}
             />
           </div>
         </div>

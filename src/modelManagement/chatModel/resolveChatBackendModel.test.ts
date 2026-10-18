@@ -7,7 +7,7 @@ import { resolveChatBackendModel } from "./resolveChatBackendModel";
 function provider(id: string, overrides: Partial<Provider> = {}): Provider {
   return {
     providerId: id,
-    providerType: "anthropic",
+    providerType: "openai-compatible",
     displayName: id,
     origin: { kind: "byok" },
     addedAt: 0,

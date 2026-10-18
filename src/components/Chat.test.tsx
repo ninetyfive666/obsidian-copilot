@@ -49,9 +49,6 @@ jest.mock("@/components/chat-components/ChatControls", () => ({
     </button>
   ),
 }));
-jest.mock("@/components/chat-components/ui/AgentModeBanner", () => ({
-  AgentModeBanner: () => null,
-}));
 jest.mock("@/components/chat-components/ChatModeInput", () => ({
   __esModule: true,
   default: (props: {

@@ -43,20 +43,10 @@ jest.mock("@/utils/chatDeepLink", () => ({
   ...jest.requireActual<typeof import("@/utils/chatDeepLink")>("@/utils/chatDeepLink"),
   findChatFileByDeepLinkId: jest.fn(),
 }));
-const mockSkillManagerDispose = jest.fn();
-const mockSkillManagerHasInstance = jest.fn(() => true);
-jest.mock("@/agentMode", () => ({
-  SkillManager: {
-    hasInstance: () => mockSkillManagerHasInstance(),
-    getInstance: () => ({ dispose: mockSkillManagerDispose }),
-  },
-}));
-
 import CopilotPlugin from "@/main";
 import CopilotView from "@/components/CopilotView";
 import { getSelectedTextContexts, setSelectedTextContexts } from "@/aiParams";
 import { DEFAULT_SETTINGS } from "@/constants";
-import { CHAT_AGENT_VIEWTYPE } from "@/constants";
 import { settingsAtom, settingsStore } from "@/settings/model";
 import type { WebSelectionTrackingOptions } from "@/services/webViewerService/webViewerServiceSelection";
 import { EditorView } from "@codemirror/view";
@@ -87,12 +77,6 @@ function createPluginUnderTest(calls: string[]) {
   Object.assign(plugin, {
     app: { workspace: { getLeavesOfType: jest.fn(() => []) } },
     chatSelectionHighlightController: { cleanup: jest.fn(() => calls.push("highlight")) },
-    agentModelDiscoveryUnsubscriber: jest.fn(() => calls.push("modelDiscovery")),
-    agentSessionManager: {
-      shutdown: jest.fn(async () => {
-        calls.push("sessions");
-      }),
-    },
     customCommandRegister: { cleanup: jest.fn(() => calls.push("customCommands")) },
     systemPromptRegister: { cleanup: jest.fn(() => calls.push("systemPrompts")) },
     projectRegister: { cleanup: jest.fn(() => calls.push("projects")) },
@@ -369,136 +353,42 @@ describe("main", () => {
       });
     });
 
-    describe("addNoteToAgentChat()", () => {
-      class AgentView {
-        eventTarget = { queueVisible: jest.fn() };
-      }
-
-      beforeEach(() => {
-        jest.clearAllMocks();
-        (isDesktopRuntime as jest.Mock).mockReturnValue(true);
-      });
-
-      it("https://github.com/Brevilabs/obsidian-copilot-private/issues/579 reveals an existing Agent Chat and attaches the note to its active draft", async () => {
-        const plugin = createPluginUnderTest([]);
-        const leaf = { view: new AgentView() } as unknown as WorkspaceLeaf;
-        const revealLeaf = jest.fn();
-        const getRightLeaf = jest.fn();
-        const addContextNoteToActiveChat = jest.fn().mockResolvedValue(undefined);
-        Object.assign(plugin, {
-          CopilotAgentView: AgentView,
-          agentSessionManager: { addContextNoteToActiveChat },
-          app: { workspace: { getLeavesOfType: jest.fn(() => [leaf]), revealLeaf, getRightLeaf } },
-        });
-        const note = Object.assign(new TFile(), { path: "Research.md" });
-
-        await plugin.addNoteToAgentChat(note, true);
-
-        expect(revealLeaf).toHaveBeenCalledWith(leaf);
-        expect(getRightLeaf).not.toHaveBeenCalled();
-        expect(addContextNoteToActiveChat).toHaveBeenCalledWith(note);
-      });
-
-      it("https://github.com/Brevilabs/obsidian-copilot-private/issues/579 opens Agent Chat in the right sidebar before attaching the note when none is open", async () => {
-        const plugin = createPluginUnderTest([]);
-        const leaf = {
-          view: new AgentView(),
-          setViewState: jest.fn().mockResolvedValue(undefined),
-        } as unknown as WorkspaceLeaf;
-        const getRightLeaf = jest.fn(() => leaf);
-        const getLeaf = jest.fn();
-        const revealLeaf = jest.fn();
-        const addContextNoteToActiveChat = jest.fn().mockResolvedValue(undefined);
-        Object.assign(plugin, {
-          CopilotAgentView: AgentView,
-          agentSessionManager: { addContextNoteToActiveChat },
-          app: {
-            workspace: { getLeavesOfType: jest.fn(() => []), getRightLeaf, getLeaf, revealLeaf },
-          },
-        });
-        const note = Object.assign(new TFile(), { path: "Journal.md" });
-
-        await plugin.addNoteToAgentChat(note, true);
-
-        expect(getRightLeaf).toHaveBeenCalledWith(false);
-        expect(getLeaf).not.toHaveBeenCalled();
-        expect(leaf.setViewState).toHaveBeenCalledWith({ type: CHAT_AGENT_VIEWTYPE, active: true });
-        expect(revealLeaf).toHaveBeenCalledWith(leaf);
-        expect(addContextNoteToActiveChat).toHaveBeenCalledWith(note);
-      });
-
-      it("https://github.com/Brevilabs/obsidian-copilot-private/issues/579 reports a failed attachment without throwing", async () => {
-        const plugin = createPluginUnderTest([]);
-        const failure = new Error("backend missing");
-        Object.assign(plugin, {
-          CopilotAgentView: AgentView,
-          agentSessionManager: {
-            addContextNoteToActiveChat: jest.fn().mockRejectedValue(failure),
-          },
-          app: {
-            workspace: {
-              getLeavesOfType: jest.fn(() => [{ view: new AgentView() }]),
-              revealLeaf: jest.fn(),
-            },
-          },
-        });
-
-        await expect(
-          plugin.addNoteToAgentChat(Object.assign(new TFile(), { path: "Research.md" }))
-        ).resolves.toBeUndefined();
-
-        expect(logError).toHaveBeenCalledWith("Failed to add a note to Agent Chat.", failure);
-        expect(Notice).toHaveBeenCalledWith(
-          "Could not add the note to Agent Chat. Check Copilot logs."
-        );
-      });
-
-      it("https://github.com/Brevilabs/obsidian-copilot-private/issues/579 reports a failure to open the Agent Chat pane without throwing", async () => {
-        const plugin = createPluginUnderTest([]);
-        const failure = new Error("view state rejected");
-        const addContextNoteToActiveChat = jest.fn();
-        Object.assign(plugin, {
-          CopilotAgentView: AgentView,
-          agentSessionManager: { addContextNoteToActiveChat },
-          app: {
-            workspace: {
-              getLeavesOfType: jest.fn(() => []),
-              getRightLeaf: jest.fn(() => ({ setViewState: jest.fn().mockRejectedValue(failure) })),
-            },
-          },
-        });
-
-        await expect(
-          plugin.addNoteToAgentChat(Object.assign(new TFile(), { path: "Research.md" }), true)
-        ).resolves.toBeUndefined();
-
-        expect(addContextNoteToActiveChat).not.toHaveBeenCalled();
-        expect(logError).toHaveBeenCalledWith("Failed to add a note to Agent Chat.", failure);
-        expect(Notice).toHaveBeenCalledWith(
-          "Could not add the note to Agent Chat. Check Copilot logs."
-        );
-      });
-    });
-
     describe("addNoteToActiveChat()", () => {
       beforeEach(() => {
         jest.clearAllMocks();
       });
 
-      it("https://github.com/Brevilabs/obsidian-copilot-private/issues/579 attaches the note to Agent Chat as context when Agent Chat is the target", async () => {
-        (isDesktopRuntime as jest.Mock).mockReturnValue(true);
+      it("https://github.com/Brevilabs/obsidian-copilot-private/issues/579 opens the Copilot chat before inserting when no chat leaf exists yet", async () => {
+        (isDesktopRuntime as jest.Mock).mockReturnValue(false);
         const plugin = createPluginUnderTest([]);
-        const addNoteToAgentChat = jest
-          .spyOn(plugin, "addNoteToAgentChat")
-          .mockResolvedValue(undefined);
-        const note = Object.assign(new TFile(), { path: "Research.md" });
+        const view = Object.assign(Object.create(CopilotView.prototype) as CopilotView, {
+          eventTarget: { queueInsertText: jest.fn() },
+        });
+        const leaf = { view } as unknown as WorkspaceLeaf;
+        const revealLeaf = jest.fn();
+        const activateView = jest.fn().mockResolvedValue(undefined);
+        Object.assign(plugin, {
+          activateView,
+          app: {
+            workspace: {
+              getLeavesOfType: jest.fn().mockReturnValueOnce([]).mockReturnValue([leaf]),
+              revealLeaf,
+            },
+          },
+        });
+        const note = Object.assign(new TFile(), {
+          path: "Notes/Research.md",
+          basename: "Research",
+        });
 
         await plugin.addNoteToActiveChat(note);
 
-        expect(addNoteToAgentChat).toHaveBeenCalledWith(note);
+        expect(activateView).toHaveBeenCalledTimes(1);
+        expect(revealLeaf).toHaveBeenCalledWith(leaf);
+        expect(view.eventTarget.queueInsertText).toHaveBeenCalledWith("[[Research]]");
       });
 
-      it("https://github.com/Brevilabs/obsidian-copilot-private/issues/579 keeps inserting a wikilink into the legacy chat when it is the target", async () => {
+      it("https://github.com/Brevilabs/obsidian-copilot-private/issues/579 reveals the open Copilot chat and inserts a wikilink", async () => {
         (isDesktopRuntime as jest.Mock).mockReturnValue(false);
         const plugin = createPluginUnderTest([]);
         const view = Object.assign(Object.create(CopilotView.prototype) as CopilotView, {
@@ -591,8 +481,6 @@ describe("main", () => {
         expect(calls).toEqual([
           "persistence",
           "highlight",
-          "modelDiscovery",
-          "sessions",
           "customCommands",
           "systemPrompts",
           "projects",
@@ -608,8 +496,6 @@ describe("main", () => {
         const plugin = createPluginUnderTest(calls);
         Object.assign(plugin, {
           chatSelectionHighlightController: undefined,
-          agentModelDiscoveryUnsubscriber: undefined,
-          agentSessionManager: undefined,
           customCommandRegister: undefined,
           systemPromptRegister: undefined,
           projectRegister: undefined,
@@ -626,10 +512,12 @@ describe("main", () => {
 
       it("logs a teardown rejection instead of leaving an unhandled promise rejection", async () => {
         const plugin = createPluginUnderTest([]);
-        const failure = new Error("shutdown failed");
-        (
-          plugin.agentSessionManager as unknown as { shutdown: jest.Mock }
-        ).shutdown.mockRejectedValue(failure);
+        const failure = new Error("dispose failed");
+        (plugin.modelManagement as unknown as { dispose: jest.Mock }).dispose.mockImplementation(
+          () => {
+            throw failure;
+          }
+        );
 
         plugin.onunload();
         await flushTeardown();
@@ -638,68 +526,6 @@ describe("main", () => {
           "Copilot: plugin teardown failed during unload:",
           failure
         );
-      });
-
-      it("disposes the skill manager on a desktop runtime", async () => {
-        (isDesktopRuntime as jest.Mock).mockReturnValue(true);
-        const plugin = createPluginUnderTest([]);
-
-        plugin.onunload();
-        await flushTeardown();
-
-        expect(mockSkillManagerDispose).toHaveBeenCalledTimes(1);
-        expect(logInfo).toHaveBeenCalledWith("Copilot plugin unloaded");
-      });
-
-      it("skips the Node-backed skill cleanup on a mobile runtime, where the barrel import would crash", async () => {
-        const plugin = createPluginUnderTest([]);
-
-        plugin.onunload();
-        await flushTeardown();
-
-        expect(mockSkillManagerDispose).not.toHaveBeenCalled();
-        expect(logInfo).toHaveBeenCalledWith("Copilot plugin unloaded");
-      });
-    });
-
-    describe("newAgentChatWithDraft()", () => {
-      beforeEach(() => {
-        jest.clearAllMocks();
-        (isDesktopRuntime as jest.Mock).mockReturnValue(true);
-      });
-
-      it("opens a global Agent session with reviewable text left as a draft for https://github.com/Brevilabs/obsidian-copilot-private/issues/166", async () => {
-        const plugin = createPluginUnderTest([]);
-        const createGlobalSessionWithDraft = jest.fn().mockResolvedValue(undefined);
-        Object.assign(plugin.agentSessionManager as object, {
-          createGlobalSessionWithDraft,
-        });
-        const activateAgentView = jest.spyOn(plugin, "activateAgentView").mockResolvedValue(null);
-
-        await plugin.newAgentChatWithDraft("Repair this skill");
-
-        expect(createGlobalSessionWithDraft).toHaveBeenCalledWith("Repair this skill");
-        expect(activateAgentView).toHaveBeenCalledTimes(1);
-        expect(createGlobalSessionWithDraft.mock.invocationCallOrder[0]).toBeLessThan(
-          activateAgentView.mock.invocationCallOrder[0]
-        );
-      });
-
-      it("surfaces session creation failures without sending or throwing for https://github.com/Brevilabs/obsidian-copilot-private/issues/166", async () => {
-        const plugin = createPluginUnderTest([]);
-        const failure = new Error("create failed");
-        Object.assign(plugin.agentSessionManager as object, {
-          createGlobalSessionWithDraft: jest.fn().mockRejectedValue(failure),
-        });
-        const activateAgentView = jest.spyOn(plugin, "activateAgentView").mockResolvedValue(null);
-
-        await expect(plugin.newAgentChatWithDraft("Repair this skill")).resolves.toBeUndefined();
-
-        expect(logWarn).toHaveBeenCalledWith(
-          "[CopilotPlugin] Failed to create agent session with draft",
-          failure
-        );
-        expect(activateAgentView).not.toHaveBeenCalled();
       });
     });
   });

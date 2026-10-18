@@ -21,41 +21,14 @@ import {
 } from "@/settings/copilotRootChange";
 import { updateSetting, useSettingsValue, validateCopilotFolder } from "@/settings/model";
 import { QuickChatPanel } from "@/settings/v2/components/QuickChatPanel";
-import { DesktopOnlySettingsPanel } from "@/settings/v2/components/DesktopOnlySettingsPanel";
 import { CopilotFolderChangeNotice } from "@/settings/v2/components/CopilotFolderChangeNotice";
 import { LegacyChatPromptsNotice } from "@/settings/v2/components/LegacyChatPromptsNotice";
-import { PlusSettings } from "@/settings/v2/components/PlusSettings";
 import { VaultInstructionsSetting } from "@/settings/v2/components/VaultInstructionsSetting";
 import { formatDateTime } from "@/utils";
-import { isDesktopRuntime } from "@/utils/desktopRuntime";
 import { revealFolderInExplorer } from "@/utils/revealFolderInExplorer";
 import { Folder, Loader2 } from "lucide-react";
 import { Notice } from "obsidian";
 import React, { useEffect, useMemo, useState } from "react";
-
-const LazyAgentSettings = React.lazy(() =>
-  import("@/settings/v2/components/AgentSettings").then((module) => ({
-    default: module.AgentSettings,
-  }))
-);
-
-const AgentsSection: React.FC = () => {
-  if (!isDesktopRuntime()) {
-    // Quick Chat also runs on mobile; its settings must stay outside the desktop import gate.
-    // https://github.com/Brevilabs/obsidian-copilot-private/issues/373
-    return (
-      <>
-        <DesktopOnlySettingsPanel message="Agent settings are available on desktop." />
-        <QuickChatPanel />
-      </>
-    );
-  }
-  return (
-    <React.Suspense fallback={null}>
-      <LazyAgentSettings />
-    </React.Suspense>
-  );
-};
 
 export const BasicSettings: React.FC = () => {
   const app = useApp();
@@ -190,9 +163,7 @@ export const BasicSettings: React.FC = () => {
 
   return (
     <div className="tw-space-y-4">
-      <PlusSettings />
-
-      <AgentsSection />
+      <QuickChatPanel />
 
       <SettingSection label="General">
         <SettingItem

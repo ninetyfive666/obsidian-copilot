@@ -81,7 +81,7 @@ describe("ToolCallBanner", () => {
 
       fireEvent.click(screen.getByRole("button", { name: /Called Test Tool/ }));
 
-      expect(screen.getByText(/returned 6,000 characters.*preserved in chat history/)).toBeTruthy();
+      expect(screen.getByText(/returned 6[.,]000 characters.*preserved in chat history/)).toBeTruthy();
     });
   });
 });

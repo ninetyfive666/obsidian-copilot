@@ -8,8 +8,6 @@ import {
   LOCAL_PROVIDER_DEFINITIONS,
 } from "@/modelManagement/catalog/builtinDefinitions";
 import { configuredModelsAtom, visibleByokProvidersAtom } from "@/modelManagement/state/atoms";
-import { providerNeedsSelfHostWarning } from "@/modelManagement/providers/selfHostPolicy";
-import type { CatalogProvider } from "@/modelManagement/types/catalog";
 import type { VerificationResult } from "@/modelManagement/types/runtime";
 import { ProviderVerificationProgress } from "@/modelManagement/ui/components/ProviderVerificationStatus";
 import type { ConfiguredModel } from "@/modelManagement/types/persisted";
@@ -22,12 +20,11 @@ import { AddProviderModal } from "@/modelManagement/ui/dialogs/AddProviderDialog
 import { ConfigureProviderModal } from "@/modelManagement/ui/dialogs/ConfigureProviderDialog";
 import { settingsStore, useSettingsValue } from "@/settings/model";
 import { useAtomValue } from "jotai";
-import { Plus, ShieldCheck } from "lucide-react";
+import { Plus } from "lucide-react";
 import { Notice } from "obsidian";
 import React, { useEffect, useMemo, useState } from "react";
 
 const EMPTY_VERIFICATION: Readonly<Record<string, VerificationResult>> = Object.freeze({});
-const EMPTY_CATALOG: readonly CatalogProvider[] = Object.freeze([]);
 const EMPTY_MODELS: readonly ConfiguredModel[] = Object.freeze([]);
 
 export const ByokPanel: React.FC = () => {
@@ -36,10 +33,7 @@ export const ByokPanel: React.FC = () => {
 
   const providers = useAtomValue(visibleByokProvidersAtom, { store: settingsStore });
   const configuredModels = useAtomValue(configuredModelsAtom, { store: settingsStore });
-  const selfHostOn = useSettingsValue().enableSelfHostMode;
 
-  const [catalogProviders, setCatalogProviders] =
-    useState<readonly CatalogProvider[]>(EMPTY_CATALOG);
   const [query, setQuery] = useState("");
   const [verification, setVerification] =
     useState<Readonly<Record<string, VerificationResult>>>(EMPTY_VERIFICATION);
@@ -78,27 +72,6 @@ export const ByokPanel: React.FC = () => {
     };
   }, [api, verificationProviders]);
 
-  useEffect(() => {
-    let cancelled = false;
-    const sync = (): void => {
-      if (!cancelled) setCatalogProviders(api.catalogService.getAllProviders());
-    };
-    const unsub = api.catalogService.onChange(sync);
-    api.catalogService
-      .ensureLoaded()
-      .then(() => {
-        if (cancelled) return;
-        sync();
-      })
-      .catch((err) => {
-        logError("[ByokPanel] catalog ensureLoaded failed", err);
-      });
-    return () => {
-      cancelled = true;
-      unsub();
-    };
-  }, [api]);
-
   const groups = useMemo<ByokTableGroup[]>(() => {
     const byProvider = new Map<string, ConfiguredModel[]>();
     for (const model of configuredModels) {
@@ -109,14 +82,11 @@ export const ByokPanel: React.FC = () => {
     const q = query.trim().toLowerCase();
     return providers
       .map((provider) => {
-        const needsSelfHostWarning =
-          selfHostOn && providerNeedsSelfHostWarning(provider, { enableSelfHostMode: selfHostOn });
         const all = byProvider.get(provider.providerId) ?? (EMPTY_MODELS as ConfiguredModel[]);
         if (!q || provider.displayName.toLowerCase().includes(q)) {
           return {
             provider,
             models: all,
-            needsSelfHostWarning,
             verification: verification[provider.providerId],
           };
         }
@@ -126,16 +96,14 @@ export const ByokPanel: React.FC = () => {
         return {
           provider,
           models,
-          needsSelfHostWarning,
           verification: verification[provider.providerId],
         };
       })
       .filter((g) => !q || g.models.length > 0 || g.provider.displayName.toLowerCase().includes(q));
-  }, [providers, configuredModels, query, selfHostOn, verification]);
+  }, [providers, configuredModels, query, verification]);
 
   const handleAddProvider = (): void => {
     new AddProviderModal(app, {
-      catalogProviders,
       localTemplates: LOCAL_PROVIDER_DEFINITIONS,
       customTemplate: CUSTOM_OPENAI_DEFINITION,
       onPick: (source) =>
@@ -173,9 +141,10 @@ export const ByokPanel: React.FC = () => {
       <ProviderVerificationProgress pending={pendingChecks} />
       <div className="tw-flex tw-items-start tw-justify-between tw-gap-4">
         <div className="tw-flex tw-flex-col tw-gap-1">
-          <div className="tw-text-xl tw-font-bold tw-text-normal">Bring Your Own Key</div>
+          <div className="tw-text-xl tw-font-bold tw-text-normal">Local Models</div>
           <div className="tw-max-w-xl tw-text-sm tw-text-muted">
-            Set up your own providers and models to use in Copilot.
+            Connect a local OpenAI-compatible server — llama.cpp llama-server, LM Studio, Ollama or
+            any custom endpoint.
           </div>
         </div>
         <Button className="tw-shrink-0" onClick={handleAddProvider}>
@@ -183,17 +152,6 @@ export const ByokPanel: React.FC = () => {
           Add a provider
         </Button>
       </div>
-
-      {selfHostOn && (
-        <div className="tw-flex tw-items-start tw-gap-2 tw-rounded-lg tw-border tw-border-solid tw-px-3 tw-py-2.5 tw-text-xs tw-text-normal tw-bg-interactive-accent/10 tw-border-interactive-accent/30">
-          <ShieldCheck className="tw-mt-0.5 tw-size-4 tw-shrink-0 tw-text-accent" />
-          <div className="tw-leading-relaxed">
-            <span className="tw-font-semibold">Self-Host Mode is on.</span> Cloud providers stay
-            available but are flagged and listed below your local and self-hosted endpoints — their
-            prompts leave your machine. You decide whether to use them.
-          </div>
-        </div>
-      )}
 
       <SearchBar value={query} onChange={setQuery} placeholder="Search providers…" />
 

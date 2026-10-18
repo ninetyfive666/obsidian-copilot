@@ -14,7 +14,7 @@ const NO_VISION = "model-cap-no-vision";
 
 const model = (overrides: Partial<CustomModel> = {}): CustomModel => ({
   name: "omni",
-  provider: "openai",
+  provider: "ollama",
   enabled: true,
   ...overrides,
 });
@@ -71,7 +71,7 @@ describe("model-display", () => {
   describe("getModelDisplayText()", () => {
     it("formats the display name and provider label", () => {
       expect(getModelDisplayText(model({ displayName: "Omni Display" }))).toBe(
-        "Omni Display (OpenAI)"
+        "Omni Display (Ollama)"
       );
     });
   });
@@ -87,7 +87,7 @@ describe("model-display", () => {
           ],
         })
       );
-      expect(text).toBe("omni (OpenAI)");
+      expect(text).toBe("omni (Ollama)");
     });
   });
 });

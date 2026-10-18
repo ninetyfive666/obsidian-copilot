@@ -19,7 +19,7 @@ const api = createModelManagement({ app: mockApp });
 const group: ByokTableGroup = {
   provider: {
     providerId: "p1",
-    providerType: "anthropic",
+    providerType: "openai-compatible",
     displayName: "Anthropic",
     origin: { kind: "byok", catalogProviderId: "anthropic" },
     addedAt: 0,

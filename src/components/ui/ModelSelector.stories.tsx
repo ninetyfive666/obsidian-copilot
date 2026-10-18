@@ -4,33 +4,30 @@ import type { ComponentProps } from "react";
 
 type ModelSelectorProps = ComponentProps<typeof ModelSelector>;
 
-const LOCKED_COPILOT_ROW: ModelSelectorEntry = {
-  name: "copilot-plus-flash",
-  provider: "copilot-plus",
-  displayName: "Copilot Plus Flash",
-  enabled: true,
-  _group: "OpenCode",
-  _backendId: "opencode",
-  _needsLicense: true,
-  _disabledReason: "Copilot license required",
-  _subtitle: "The default model: fastest responses and the most quota.",
+const DISABLED_MODEL_ROW: ModelSelectorEntry = {
+  name: "qwen2.5:14b",
+  provider: "ollama",
+  displayName: "ollama/qwen2.5:14b",
+  enabled: false,
+  _group: "Ollama",
+  _disabledReason: "Ollama is not reachable at http://localhost:11434",
 };
 
-const OWN_MODELS: ModelSelectorEntry[] = [
+const LOCAL_MODELS: ModelSelectorEntry[] = [
   {
-    name: "grok-code",
-    provider: "opencode",
-    displayName: "opencode/grok-code",
+    name: "llama3.1:8b",
+    provider: "ollama",
+    displayName: "ollama/llama3.1:8b",
     enabled: true,
-    _group: "OpenCode",
-    _isFree: true,
+    _group: "Ollama",
+    _subtitle: "Runs locally via Ollama.",
   },
   {
-    name: "claude-sonnet-4-6",
-    provider: "anthropic",
-    displayName: "anthropic/claude-sonnet-4-6",
+    name: "mistral-7b-instruct",
+    provider: "lmstudio",
+    displayName: "lmstudio/mistral-7b-instruct",
     enabled: true,
-    _group: "OpenCode",
+    _group: "LM Studio",
   },
 ];
 
@@ -38,26 +35,26 @@ const meta = {
   title: "UI/Model Selector",
   component: ModelSelector,
   args: {
-    value: "grok-code|opencode",
+    value: "llama3.1:8b|ollama",
     onChange: () => undefined,
-    models: OWN_MODELS,
+    models: LOCAL_MODELS,
   },
   parameters: { gallery: { host: "popover", layout: "padded" } },
 } satisfies Meta<ModelSelectorProps>;
 export default meta;
 
-export const Licensed: StoryObj<ModelSelectorProps> = {};
+export const LocalModels: StoryObj<ModelSelectorProps> = {};
 
-export const Unlicensed: StoryObj<ModelSelectorProps> = {
+export const UnreachableProvider: StoryObj<ModelSelectorProps> = {
   args: {
-    models: [LOCKED_COPILOT_ROW, ...OWN_MODELS],
+    models: [DISABLED_MODEL_ROW, ...LOCAL_MODELS],
   },
 };
 
-export const UnlicensedWithNoModelsOfTheirOwn: StoryObj<ModelSelectorProps> = {
+export const NoModels: StoryObj<ModelSelectorProps> = {
   args: {
     value: "",
-    models: [LOCKED_COPILOT_ROW],
+    models: [],
   },
 };
 

@@ -1,4 +1,3 @@
-import { CHAT_AGENT_VIEWTYPE } from "@/constants";
 import { Button } from "@/components/ui/button";
 import { SettingItem } from "@/components/ui/setting-item";
 import { SettingSection } from "@/components/ui/setting-section";
@@ -24,113 +23,16 @@ import {
 import { Info, ShieldCheck, Trash2 } from "lucide-react";
 import { ConfirmModal } from "@/components/modals/ConfirmModal";
 import { Notice } from "obsidian";
-import React, { useCallback, useEffect, useState } from "react";
-import { isDesktopRuntime } from "@/utils/desktopRuntime";
+import React, { useCallback, useState } from "react";
 import { safeAsyncHandler } from "@/utils/safeAsyncHandler";
-import { getPersistedDeviceId } from "@/utils/deviceId";
-import { createReportUploader } from "@/utils/reportUpload.brevilabs";
-
-const DESKTOP_UNAVAILABLE_FRAME_LOG_PATH = "(Agent Mode frame logs are desktop-only)";
 
 export const AdvancedSettings: React.FC = () => {
   const app = useApp();
   const settings = useSettingsValue();
   const [forgetting, setForgetting] = useState(false);
-  const [frameLogPath, setFrameLogPath] = useState(DESKTOP_UNAVAILABLE_FRAME_LOG_PATH);
-
-  useEffect(() => {
-    if (!isDesktopRuntime()) return;
-
-    let cancelled = false;
-    void import("@/agentMode").then(({ acpFrameSink }) => {
-      if (!cancelled) {
-        setFrameLogPath(acpFrameSink.getPath());
-      }
-    });
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   const keychainAvailable = KeychainService.getInstance().isAvailable();
   const keychainAppearsEmpty = keychainAvailable && !hasPersistedSecrets(settings);
-
-  const handleReportIssue = useCallback(() => {
-    if (!isDesktopRuntime()) {
-      new Notice("Reporting an issue is available on desktop only.");
-      return;
-    }
-    void (async () => {
-      const { ReportIssueModal } = await import("@/agentMode");
-      const copilotPlugin = (
-        app as unknown as {
-          plugins: {
-            getPlugin: (id: string) => {
-              manifest?: { version?: string };
-              agentSessionManager?: { getActiveSession?: () => { backendId?: string } | null };
-            } | null;
-          };
-        }
-      ).plugins.getPlugin("copilot");
-      const activeBackend =
-        copilotPlugin?.agentSessionManager?.getActiveSession?.()?.backendId ??
-        settings.agentMode.activeBackend;
-      const pluginVersion = copilotPlugin?.manifest?.version ?? "unknown";
-      new ReportIssueModal({
-        app,
-        activeBackend,
-        pluginVersion,
-        canCaptureTarget: () => app.workspace.getLeavesOfType(CHAT_AGENT_VIEWTYPE).length > 0,
-        resolveCaptureTarget: () => {
-          const leaf = app.workspace.getLeavesOfType(CHAT_AGENT_VIEWTYPE)[0];
-          if (!leaf) return null;
-          app.workspace.revealLeaf(leaf);
-          const view = leaf.view as unknown as {
-            contentEl?: HTMLElement;
-            containerEl?: HTMLElement;
-          };
-          return view.contentEl ?? view.containerEl ?? null;
-        },
-        dismissSettings: () => {
-          (app as unknown as { setting: { close: () => void } }).setting.close();
-        },
-        uploader: createReportUploader({
-          installId: () => getPersistedDeviceId(app),
-          clientVersion: pluginVersion,
-        }),
-      }).open();
-    })();
-  }, [app, settings.agentMode.activeBackend]);
-
-  const handleOpenFrameLog = useCallback(async () => {
-    if (!isDesktopRuntime()) {
-      new Notice("Agent Mode frame logs are available on desktop only.");
-      return;
-    }
-    try {
-      const { acpFrameSink } = await import("@/agentMode");
-      await acpFrameSink.open();
-      setFrameLogPath(acpFrameSink.getPath());
-    } catch {
-      new Notice("Failed to open Agent Mode frame log.");
-    }
-  }, []);
-
-  const handleClearFrameLog = useCallback(async () => {
-    if (!isDesktopRuntime()) {
-      new Notice("Agent Mode frame logs are available on desktop only.");
-      return;
-    }
-    try {
-      const { acpFrameSink } = await import("@/agentMode");
-      await acpFrameSink.clear();
-      setFrameLogPath(acpFrameSink.getPath());
-      new Notice("Agent Mode frame log cleared.");
-    } catch {
-      new Notice("Failed to clear Agent Mode frame log.");
-    }
-  }, []);
 
   const handleForgetAllSecrets = useCallback(async () => {
     if (forgetting) return;
@@ -241,16 +143,6 @@ export const AdvancedSettings: React.FC = () => {
       <DebuggingSupportSection
         debug={settings.debug}
         onDebugChange={(checked) => updateSetting("debug", checked)}
-        frameLogEnabled={settings.agentMode.debugFullFrames}
-        onFrameLogChange={(checked) => {
-          setSettings((cur) => ({
-            agentMode: { ...cur.agentMode, debugFullFrames: checked },
-          }));
-        }}
-        frameLogPath={frameLogPath}
-        onReportIssue={handleReportIssue}
-        onOpenFrameLog={safeAsyncHandler(handleOpenFrameLog)}
-        onClearFrameLog={safeAsyncHandler(handleClearFrameLog)}
       />
     </div>
   );

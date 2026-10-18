@@ -50,23 +50,13 @@ const baseProps = {
 
 describe("ChatContextMenu", () => {
   describe("ChatContextMenu()", () => {
-    it("renders nothing in Agent Mode when there are no context badges", () => {
-      const { container } = render(
-        <ChatContextMenu {...baseProps} isAgentMode hideAddContextButton />
-      );
-      expect(container.childElementCount).toBe(0);
-    });
-
-    it("keeps the row with its badges in Agent Mode once context exists", () => {
+    it("shows the context note badge next to the entry", () => {
       const note = Object.assign(new TFile(), {
         path: "Note.md",
         basename: "Note",
         extension: "md",
       });
-      const { container } = render(
-        <ChatContextMenu {...baseProps} contextNotes={[note]} isAgentMode hideAddContextButton />
-      );
-      expect(container.childElementCount).toBeGreaterThan(0);
+      render(<ChatContextMenu {...baseProps} contextNotes={[note]} />);
       expect(screen.getByText("Note")).toBeTruthy();
     });
 
@@ -136,26 +126,20 @@ describe("ChatContextMenu", () => {
           selectedTextContexts: [selection],
           onRemoveContext,
         };
-        const { rerender } = render(
-          <ChatContextMenu {...props} isAgentMode hideAddContextButton />
-        );
+        const { rerender } = render(<ChatContextMenu {...props} />);
         expect(screen.getByText("Current")).toBeTruthy();
         expect(screen.getByText("L2-3")).toBeTruthy();
 
         fireEvent.keyDown(screen.getByText("Current").parentElement!, { key: "Enter" });
         expect(onRemoveContext).toHaveBeenLastCalledWith("activeNote", "");
-        rerender(
-          <ChatContextMenu {...props} includeActiveNote={false} isAgentMode hideAddContextButton />
-        );
+        rerender(<ChatContextMenu {...props} includeActiveNote={false} />);
         expect(screen.queryByText("Current")).toBeNull();
         expect(screen.getByText("L2-3")).toBeTruthy();
 
-        rerender(<ChatContextMenu {...props} isAgentMode hideAddContextButton />);
+        rerender(<ChatContextMenu {...props} />);
         fireEvent.keyDown(screen.getByText("L2-3").parentElement!, { key: "Enter" });
         expect(onRemoveContext).toHaveBeenLastCalledWith("selectedText", "excerpt");
-        rerender(
-          <ChatContextMenu {...props} selectedTextContexts={[]} isAgentMode hideAddContextButton />
-        );
+        rerender(<ChatContextMenu {...props} selectedTextContexts={[]} />);
         expect(screen.getByText("Current")).toBeTruthy();
         expect(screen.queryByText("L2-3")).toBeNull();
       }

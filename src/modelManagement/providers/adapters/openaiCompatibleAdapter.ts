@@ -4,7 +4,6 @@ import type { BaseChatModel } from "@langchain/core/language_models/chat_models"
 
 import type { VerificationResult } from "@/modelManagement/types/runtime";
 import type { AdapterBuildContext, AdapterVerifyContext, ProviderAdapter } from "./ProviderAdapter";
-import { verifyPathForCatalogProviderId } from "./openaiCompatibleVerifyPath";
 import { verifyViaListModels } from "./verifyViaListModels";
 
 const extrasSchema = z
@@ -45,10 +44,6 @@ export const openaiCompatibleAdapter: ProviderAdapter<Extras> = {
       headers["OpenAI-Organization"] = ctx.extras.openAIOrgId;
     }
 
-    const catalogProviderId =
-      ctx.provider.origin.kind === "byok" ? ctx.provider.origin.catalogProviderId : undefined;
-    const verifyPath = verifyPathForCatalogProviderId(catalogProviderId);
-
-    return verifyViaListModels(`${base}/${verifyPath}`, headers);
+    return verifyViaListModels(`${base}/models`, headers);
   },
 };

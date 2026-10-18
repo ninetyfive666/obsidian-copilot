@@ -37,8 +37,6 @@ interface ChatContextMenuProps {
     data: TFile | string | TFolder | WebTabContext | null
   ) => void;
   lexicalEditorRef?: React.RefObject<{ focus: () => void }>;
-  hideAddContextButton?: boolean;
-  isAgentMode?: boolean;
 }
 
 export const ChatContextMenu: React.FC<ChatContextMenuProps> = ({
@@ -54,8 +52,6 @@ export const ChatContextMenu: React.FC<ChatContextMenuProps> = ({
   onRemoveContext,
   onTypeaheadSelect,
   lexicalEditorRef,
-  hideAddContextButton = false,
-  isAgentMode = false,
 }) => {
   const app = useApp();
   const [currentChain] = useChainType();
@@ -110,14 +106,9 @@ export const ChatContextMenu: React.FC<ChatContextMenuProps> = ({
     activeNoteVisible ||
     activeWebTabVisible;
 
-  if (isAgentMode && !hasContext) {
-    return null;
-  }
-
   return (
     <div className="tw-flex tw-w-full tw-items-start tw-gap-1">
-      {!hideAddContextButton && (
-        <div className="tw-flex tw-h-full tw-items-start">
+      <div className="tw-flex tw-h-full tw-items-start">
           <Popover open={showTypeahead} onOpenChange={setShowTypeahead}>
             <PopoverTrigger asChild>
               <Button
@@ -142,8 +133,7 @@ export const ChatContextMenu: React.FC<ChatContextMenuProps> = ({
               />
             </PopoverContent>
           </Popover>
-        </div>
-      )}
+      </div>
       <div className="tw-flex tw-flex-1 tw-flex-wrap tw-gap-1">
         {activeNoteVisible && currentActiveFile && (
           <ContextActiveNoteBadge

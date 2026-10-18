@@ -3,7 +3,6 @@ import { useChainType, useModelKey } from "@/aiParams";
 import { Button } from "@/components/ui/button";
 import { ModelSelector, type ModelSelectorEntry } from "@/components/ui/ModelSelector";
 import { useSettingsValue } from "@/settings/model";
-import type { CopilotMode } from "@/agentMode";
 import { isPlusChain } from "@/utils";
 import {
   mergeWebTabContexts,
@@ -36,7 +35,6 @@ import { AddContextButton } from "./AddContextButton";
 import { openImagePicker } from "./openImagePicker";
 import { shouldShowAtMentionTools } from "./hooks/useAtMentionCategories";
 import { ModelEffortPicker } from "@/components/ui/ModelEffortPicker";
-import { ModePicker } from "@/components/ui/ModePicker";
 import { $removePillsByPath } from "./pills/NotePillNode";
 import { $removeActiveNotePills } from "./pills/ActiveNotePillNode";
 import { $removePillsByURL } from "./pills/URLPillNode";
@@ -46,9 +44,6 @@ import { $removeActiveWebTabPills } from "./pills/ActiveWebTabPillNode";
 import { $findWebTabPills, $removeWebTabPillsByUrl } from "./pills/WebTabPillNode";
 import LexicalEditor from "./LexicalEditor";
 import { cn } from "@/lib/utils";
-import { type AgentMentionBrand, EMPTY_AGENT_MENTION_BRANDS } from "./hooks/useAtMentionCategories";
-import { EMPTY_CLOUD_AGENT_IDS } from "./context/CloudAgentContext";
-import { $createAgentPillNode } from "./pills/AgentPillNode";
 
 const ACCENT_CIRCLE_BUTTON_CLASS =
   "tw-rounded-full tw-bg-interactive-accent tw-text-on-accent hover:tw-bg-interactive-accent-hover";
@@ -96,12 +91,6 @@ export interface ChatInputProps {
     effortOptionsByModelKey?: Record<string, { label: string; value: string | null }[]>;
     commitSelection?: (modelKey: string, effort: string | null) => void;
   };
-  modePickerOverride?: {
-    options: { label: string; value: CopilotMode }[];
-    value: CopilotMode | null;
-    onChange: (value: CopilotMode) => void;
-    disabled?: boolean;
-  };
   selectedTextContexts?: SelectedTextContext[];
   onRemoveSelectedText?: (id: string) => void;
 
@@ -130,22 +119,11 @@ export interface ChatInputProps {
     folders?: string[];
   };
 
-  isAgentMode?: boolean;
-
-  agentBrands?: ReadonlyArray<AgentMentionBrand>;
-
-  cloudAgentIds?: ReadonlySet<string>;
-
-  onMentionedAgentsChange?: (backendIds: string[]) => void;
 }
 
 export interface ChatInputHandle {
   removeToolPills(toolNames: string[]): void;
-  prependContent(
-    text: string,
-    agentIds: readonly string[],
-    webTabs: readonly WebTabContext[]
-  ): void;
+  prependContent(text: string, webTabs: readonly WebTabContext[]): void;
 }
 
 const ChatInput = React.forwardRef<ChatInputHandle, ChatInputProps>(function ChatInput(
@@ -170,7 +148,6 @@ const ChatInput = React.forwardRef<ChatInputHandle, ChatInputProps>(function Cha
     setSelectedImages,
     disableModelSwitch,
     modelPickerOverride,
-    modePickerOverride,
     selectedTextContexts,
     onRemoveSelectedText,
     toolControls,
@@ -182,10 +159,6 @@ const ChatInput = React.forwardRef<ChatInputHandle, ChatInputProps>(function Cha
     onEditSave,
     onEditCancel,
     initialContext,
-    isAgentMode = false,
-    agentBrands = EMPTY_AGENT_MENTION_BRANDS,
-    cloudAgentIds = EMPTY_CLOUD_AGENT_IDS,
-    onMentionedAgentsChange,
   },
   ref
 ) {
@@ -206,7 +179,7 @@ const ChatInput = React.forwardRef<ChatInputHandle, ChatInputProps>(function Cha
   const [foldersFromPills, setFoldersFromPills] = useState<string[]>([]);
   const [webTabsFromPills, setWebTabsFromPills] = useState<WebTabContext[]>([]);
   const isCopilotPlus = isPlusChain(currentChain);
-  const showAtMentionTools = shouldShowAtMentionTools({ isCopilotPlus, isAgentMode });
+  const showAtMentionTools = shouldShowAtMentionTools({ isCopilotPlus });
 
   const mergedContextWebTabs = useMemo(() => {
     return mergeWebTabContexts([...contextWebTabs, ...webTabsFromPills]);
@@ -265,13 +238,6 @@ const ChatInput = React.forwardRef<ChatInputHandle, ChatInputProps>(function Cha
       });
     });
   };
-
-  const handleAgentsChange = useCallback(
-    (backendIds: string[]) => {
-      onMentionedAgentsChange?.(backendIds);
-    },
-    [onMentionedAgentsChange]
-  );
 
   const handleURLPillsRemoved = (removedUrls: string[]) => {
     const removedUrlSet = new Set(removedUrls);
@@ -349,17 +315,6 @@ const ChatInput = React.forwardRef<ChatInputHandle, ChatInputProps>(function Cha
             if ($isRangeSelection(selection)) {
               const toolPill = $createToolPillNode(data);
               selection.insertNodes([toolPill]);
-            }
-          });
-        }
-        break;
-      case "agents":
-        if (typeof data === "string" && lexicalEditorRef.current) {
-          const label = agentBrands.find((b) => b.id === data)?.displayName ?? data;
-          lexicalEditorRef.current.update(() => {
-            const selection = $getSelection();
-            if ($isRangeSelection(selection)) {
-              selection.insertNodes([$createAgentPillNode(data, label)]);
             }
           });
         }
@@ -591,18 +546,15 @@ const ChatInput = React.forwardRef<ChatInputHandle, ChatInputProps>(function Cha
   useImperativeHandle(
     ref,
     () => ({
-      prependContent(text, agentIds, webTabs) {
+      prependContent(text, webTabs) {
         setContextWebTabs((previous) => mergeWebTabContexts([...webTabs, ...previous]));
         lexicalEditorRef.current?.update(
           () => {
             // Preserve the current draft's structured pills when restoring a stopped queue.
             // https://github.com/Brevilabs/obsidian-copilot-private/issues/485
             const root = $getRoot();
-            const pills = agentIds.map((id) =>
-              $createAgentPillNode(id, agentBrands.find((b) => b.id === id)?.displayName ?? id)
-            );
             const separator = root.getTextContent().trim() ? "\n\n" : "";
-            root.selectStart().insertNodes([...pills, $createTextNode(text + separator)]);
+            root.selectStart().insertNodes([$createTextNode(text + separator)]);
             setInputMessage(root.getTextContent());
           },
           { discrete: true }
@@ -615,7 +567,7 @@ const ChatInput = React.forwardRef<ChatInputHandle, ChatInputProps>(function Cha
         });
       },
     }),
-    [agentBrands, setInputMessage]
+    [setInputMessage]
   );
 
   const handleActiveNoteAdded = useCallback(() => {
@@ -636,13 +588,7 @@ const ChatInput = React.forwardRef<ChatInputHandle, ChatInputProps>(function Cha
 
   return (
     <div
-      className={cn(
-        "tw-flex tw-w-full tw-flex-col tw-gap-0.5 tw-rounded-md tw-border tw-border-solid tw-border-border tw-px-1 tw-pb-1 tw-pt-2 tw-@container/chat-input",
-        modePickerOverride?.value === "plan" &&
-          "tw-shadow-[0_0_10px_rgba(var(--color-blue-rgb),0.18)] tw-border-blue/60",
-        modePickerOverride?.value === "auto" &&
-          "tw-shadow-[0_0_10px_rgba(var(--color-red-rgb),0.18)] tw-border-red/60"
-      )}
+      className="tw-flex tw-w-full tw-flex-col tw-gap-0.5 tw-rounded-md tw-border tw-border-solid tw-border-border tw-px-1 tw-pb-1 tw-pt-2 tw-@container/chat-input"
       ref={containerRef}
     >
       <div className="tw-flex tw-gap-1">
@@ -660,8 +606,6 @@ const ChatInput = React.forwardRef<ChatInputHandle, ChatInputProps>(function Cha
               selectedTextContexts={selectedTextContexts}
               onAddToContext={handleAddToContext}
               onRemoveFromContext={handleRemoveFromContext}
-              hideAddContextButton={isAgentMode}
-              isAgentMode={isAgentMode}
             />
           )}
 
@@ -704,9 +648,6 @@ const ChatInput = React.forwardRef<ChatInputHandle, ChatInputProps>(function Cha
               onWebTabsChange={setWebTabsFromPills}
               onActiveWebTabAdded={handleActiveWebTabAdded}
               onActiveWebTabRemoved={handleActiveWebTabRemoved}
-              agentBrands={agentBrands}
-              cloudAgentIds={cloudAgentIds}
-              onAgentsChange={handleAgentsChange}
               onEditorReady={onEditorReady}
               onImagePaste={onAddImage}
               onTagSelected={onTagSelected}
@@ -756,7 +697,6 @@ const ChatInput = React.forwardRef<ChatInputHandle, ChatInputProps>(function Cha
               disabled={modelPickerOverride?.disabled ?? disableModelSwitch}
               value={modelPickerOverride?.value ?? currentModelKey}
               models={modelPickerOverride?.models ?? settings.activeModels}
-              apiKeySettings={modelPickerOverride ? undefined : settings}
               onChange={modelPickerOverride?.onChange ?? setCurrentModelKey}
               className="tw-min-w-0 tw-max-w-full tw-truncate"
             />
@@ -765,7 +705,6 @@ const ChatInput = React.forwardRef<ChatInputHandle, ChatInputProps>(function Cha
 
         <div className="tw-flex tw-items-center tw-gap-1">
           {!isGenerating && toolControls}
-          {modePickerOverride && <ModePicker override={modePickerOverride} />}
           {isGenerating ? (
             <Button
               size="icon"

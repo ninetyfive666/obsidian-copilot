@@ -11,21 +11,21 @@ export type ResolvedChatBackendEntry = Extract<EnabledBackendEntry, { state: "ok
 const DISPLAY_NAME_TO_LEGACY_PROVIDER: Record<string, ChatModelProviders> = {
   ollama: ChatModelProviders.OLLAMA,
   "lm studio": ChatModelProviders.LM_STUDIO,
+  "llama.cpp (llama-server)": ChatModelProviders.OPENAI_FORMAT,
   "openai format": ChatModelProviders.OPENAI_FORMAT,
-  cohere: ChatModelProviders.COHEREAI,
-  siliconflow: ChatModelProviders.SILICONFLOW,
 };
 
 function getLegacyChatModelKeys(entry: ResolvedChatBackendEntry): readonly string[] {
   const providers = new Set<ChatModelProviders>([
     mapProviderTypeToChatModelProvider(entry.provider),
   ]);
-  if (entry.provider.origin.kind === "copilot-plus") {
-    providers.add(ChatModelProviders.COPILOT_PLUS);
-  }
   if (entry.provider.origin.kind === "byok" && entry.provider.origin.catalogProviderId) {
     const catalogProvider = CATALOG_ID_TO_CHAT_PROVIDER[entry.provider.origin.catalogProviderId];
     if (catalogProvider) providers.add(catalogProvider);
+    // Pre-cleanup selections persisted the catalog id as the wire value (e.g.
+    // `gpt-4o|openai`), so removed cloud catalog ids must still resolve.
+    // https://github.com/Brevilabs/obsidian-copilot-private/issues/616
+    providers.add(entry.provider.origin.catalogProviderId as ChatModelProviders);
   }
   const displayProvider = DISPLAY_NAME_TO_LEGACY_PROVIDER[entry.provider.displayName.toLowerCase()];
   if (displayProvider) providers.add(displayProvider);

@@ -32,14 +32,6 @@ jest.mock("obsidian", () => ({
   Notice: jest.fn(),
 }));
 
-jest.mock("@/LLMProviders/brevilabsClient", () => ({
-  BrevilabsClient: {
-    getInstance: jest.fn().mockReturnValue({
-      validateLicenseKey: jest.fn().mockResolvedValue({ isValid: true, plan: "believer" }),
-    }),
-  },
-}));
-
 const createTestFile = (path: string) => {
   const file = new TFile();
   file.path = path;

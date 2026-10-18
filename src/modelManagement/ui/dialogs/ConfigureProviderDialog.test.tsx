@@ -44,7 +44,7 @@ jest.mock("@/modelManagement/state/atoms", () => {
     byokProvidersAtom: jotai.atom([
       {
         providerId: "p1",
-        providerType: "anthropic",
+        providerType: "openai-compatible",
         displayName: "Anthropic",
         baseUrl: "https://api.anthropic.com",
         origin: { kind: "byok", catalogProviderId: "anthropic" },
@@ -113,7 +113,7 @@ beforeEach(() => {
 const anthropicSource: ProviderDefinition = {
   id: "anthropic",
   displayName: "Anthropic",
-  providerType: "anthropic",
+  providerType: "openai-compatible",
   defaultBaseUrl: "https://api.anthropic.com",
   requiresApiKey: true,
   modelInputHint: "e.g. claude-sonnet-5",
@@ -141,7 +141,7 @@ const ollamaSource: ProviderDefinition = {
 const anthropicCatalogMetadata = {
   id: "anthropic",
   displayName: "Anthropic",
-  providerType: "anthropic" as const,
+  providerType: "openai-compatible" as const,
   defaultBaseUrl: "https://api.anthropic.com",
   models: {
     "claude-sonnet": {
@@ -275,7 +275,7 @@ describe("ConfigureProviderDialog", () => {
       expect(mockSetupProvider).toHaveBeenCalledWith(
         expect.objectContaining({
           catalogProviderId: "anthropic",
-          providerType: "anthropic",
+          providerType: "openai-compatible",
           displayName: "Anthropic",
           baseUrl: "https://api.anthropic.com",
           models: [

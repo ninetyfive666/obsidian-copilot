@@ -1,4 +1,3 @@
-import { BrevilabsClient } from "@/LLMProviders/brevilabsClient";
 import { err2String } from "@/errorFormat";
 import { logInfo, logWarn } from "@/logger";
 import { getCachedProjectRecordById } from "@/projects/state";
@@ -289,23 +288,28 @@ async function runMaterialize(
   }
 }
 
+const UNSUPPORTED_REMOTE_SOURCE_ERROR =
+  "Remote context sources need network access, which is unavailable in this local-only build.";
+const UNSUPPORTED_BINARY_FILE_PREFIX = "[Unsupported:";
+
+function decodeLocalText(bytes: ArrayBuffer, ext: string): string {
+  const content = new TextDecoder("utf-8", { fatal: false }).decode(bytes);
+  // Binary payloads decode to replacement characters; only clean text becomes context.
+  if (content.includes("\uFFFD") || content.includes("\u0000")) {
+    throw new Error(
+      `${UNSUPPORTED_BINARY_FILE_PREFIX} .${ext} cannot be converted offline. This plugin only reads plain-text notes.]`
+    );
+  }
+  if (!content.trim()) throw new Error(`empty parse result for .${ext}`);
+  return content;
+}
+
 function createConverters(): ContextConverters {
   return {
     fetchRemote: async (source) => {
-      const client = BrevilabsClient.getInstance();
-      const content =
-        source.type === "youtube"
-          ? ((await client.youtube4llm(source.url)).response?.transcript ?? "")
-          : ((await client.url4llm(source.url)).response ?? "");
-      if (!content.trim()) throw new Error(`empty content for ${source.url}`);
-      return content;
+      throw new Error(`${UNSUPPORTED_REMOTE_SOURCE_ERROR} (${source.url})`);
     },
-    parseFile: async (bytes, ext) => {
-      const { response } = await BrevilabsClient.getInstance().docs4llm(bytes, ext);
-      const content = docs4llmToText(response);
-      if (!content.trim()) throw new Error(`empty parse result for .${ext}`);
-      return content;
-    },
+    parseFile: async (bytes, ext) => decodeLocalText(bytes, ext),
   };
 }
 
@@ -373,16 +377,6 @@ export async function materializeProjectContextSource(
     return [
       { source: item.source, kind: item.kind, error: err2String(err), usedStaleSnapshot: false },
     ];
-  }
-}
-
-function docs4llmToText(response: unknown): string {
-  if (typeof response === "string") return response;
-  try {
-    return JSON.stringify(response, null, 2);
-  } catch (err) {
-    logWarn(`[project-context] could not stringify docs4llm response: ${err2String(err)}`);
-    return "";
   }
 }
 

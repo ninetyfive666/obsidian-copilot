@@ -5,7 +5,7 @@ import React from "react";
 const TabProbe: React.FC = () => {
   const { selectedTab, setSelectedTab } = useTab();
   return (
-    <button type="button" onClick={() => setSelectedTab("skills")}>
+    <button type="button" onClick={() => setSelectedTab("byok")}>
       {selectedTab}
     </button>
   );
@@ -44,7 +44,7 @@ describe("TabContext", () => {
 
       fireEvent.click(screen.getByRole("button", { name: "basic" }));
 
-      expect(screen.getByRole("button", { name: "skills" })).toBeTruthy();
+      expect(screen.getByRole("button", { name: "byok" })).toBeTruthy();
     });
   });
 });

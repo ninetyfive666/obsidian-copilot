@@ -27,11 +27,6 @@ function provider(overrides: Partial<Provider> = {}): Provider {
   };
 }
 
-const OPENROUTER = {
-  baseUrl: "https://openrouter.ai/api/v1",
-  origin: { kind: "byok", catalogProviderId: "openrouter" },
-} as const;
-
 describe("openaiCompatibleAdapter", () => {
   describe("verifyCredentials()", () => {
     beforeEach(() => {
@@ -105,24 +100,11 @@ describe("openaiCompatibleAdapter", () => {
       );
     });
 
-    it("verifies OpenRouter against its auth-gated /key path because public /models would always succeed", async () => {
-      await openaiCompatibleAdapter.verifyCredentials({
-        provider: provider(OPENROUTER),
-        apiKey: "sk-or",
-        extras: {},
-      });
-
-      expect(mockSafeFetch).toHaveBeenCalledWith("https://openrouter.ai/api/v1/key", {
-        method: "GET",
-        headers: { Authorization: "Bearer sk-or" },
-      });
-    });
-
-    it("reports invalid_api_key when OpenRouter's /key rejects the key with 401", async () => {
+    it("reports invalid_api_key when the models endpoint rejects the key with 401", async () => {
       respondWith(401);
 
       const result = await openaiCompatibleAdapter.verifyCredentials({
-        provider: provider(OPENROUTER),
+        provider: provider(),
         apiKey: "sk-wrong",
         extras: {},
       });

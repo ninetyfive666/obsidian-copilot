@@ -5,40 +5,55 @@ import * as React from "react";
 
 type ModelEnableListProps = React.ComponentProps<typeof ModelEnableList>;
 
-const LONG_GROUP: ModelEnableGroup = {
-  key: "byok",
-  label: "OpenAI",
-  badge: "BYOK",
+const OLLAMA_GROUP: ModelEnableGroup = {
+  key: "byok:ollama",
+  label: "Ollama",
+  badge: "Local",
+  tooltip: "Runs on http://localhost:11434",
+  highlight: true,
+  rows: [
+    {
+      id: "ollama/llama3.1:8b",
+      label: "llama3.1:8b",
+      enabled: true,
+      capabilities: ["vision" as ModelCapability],
+    },
+    { id: "ollama/qwen2.5:14b", label: "qwen2.5:14b", enabled: true, capabilities: [] },
+    { id: "ollama/mistral:7b", label: "mistral:7b", enabled: false, capabilities: [] },
+  ],
+};
+
+const LMSTUDIO_GROUP: ModelEnableGroup = {
+  key: "byok:lmstudio",
+  label: "LM Studio",
+  badge: "Local",
+  tooltip: "Runs on http://localhost:1234/v1",
+  rows: [
+    { id: "lmstudio/mistral-7b-instruct", label: "mistral-7b-instruct", enabled: true },
+    { id: "lmstudio/qwen2.5-coder-14b", label: "qwen2.5-coder-14b-instruct", enabled: false },
+  ],
+};
+
+const CUSTOM_GROUP: ModelEnableGroup = {
+  key: "byok:custom",
+  label: "Custom endpoint",
+  badge: "OpenAI-compatible",
   rows: Array.from({ length: 18 }, (_, i) => ({
-    id: `openai/model-${i}`,
-    label: `gpt-nova-${i}`,
+    id: `custom/model-${i}`,
+    label: `local-model-${i}`,
     enabled: i < 3,
   })),
 };
 
-const PLUS_GROUP: ModelEnableGroup = {
-  key: "plus",
-  label: "Copilot Plus",
-  badge: "privacy",
-  tooltip: "Copilot license required",
-  highlight: true,
+const UNREACHABLE_GROUP: ModelEnableGroup = {
+  key: "byok:unreachable",
+  label: "Ollama (offline)",
+  badge: "Local",
+  tooltip: "Ollama is not reachable at http://localhost:11434",
   rows: [
-    {
-      id: "plus/flash",
-      label: "copilot-plus-flash",
-      enabled: true,
-      capabilities: ["vision" as ModelCapability],
-    },
-    { id: "plus/deepseek", label: "copilot-plus-deepseek-v4-pro", enabled: true, capabilities: [] },
-    { id: "plus/glm", label: "copilot-plus-glm-5.2", enabled: false, capabilities: [] },
+    { id: "offline/llama3.1:8b", label: "llama3.1:8b", enabled: false },
+    { id: "offline/mistral:7b", label: "mistral:7b", enabled: false },
   ],
-};
-
-const FREE_GROUP: ModelEnableGroup = {
-  key: "agent",
-  label: "OpenCode",
-  badge: "Agent Provided",
-  rows: [{ id: "opencode/grok-code", label: "grok-code-fast-1", enabled: true, isFree: true }],
 };
 
 const Controlled: React.FC<{ groups: ModelEnableGroup[]; defaultOpenGroupKey?: string }> = ({
@@ -58,7 +73,7 @@ const Controlled: React.FC<{ groups: ModelEnableGroup[]; defaultOpenGroupKey?: s
 };
 
 const meta = {
-  title: "Agent Mode/Model Enable List",
+  title: "Settings/Model Enable List",
   component: ModelEnableList,
   args: {
     groups: [],
@@ -71,28 +86,28 @@ const meta = {
 export default meta;
 
 export const OverflowingCatalog: StoryObj<ModelEnableListProps> = {
-  render: () => <Controlled groups={[PLUS_GROUP, FREE_GROUP, LONG_GROUP]} />,
+  render: () => <Controlled groups={[OLLAMA_GROUP, LMSTUDIO_GROUP, CUSTOM_GROUP]} />,
 };
 
 export const ShortCatalog: StoryObj<ModelEnableListProps> = {
-  render: () => <Controlled groups={[PLUS_GROUP, FREE_GROUP]} />,
+  render: () => <Controlled groups={[OLLAMA_GROUP, LMSTUDIO_GROUP]} />,
 };
 
 export const CollapsedWithSelections: StoryObj<ModelEnableListProps> = {
   render: () => (
     <Controlled
       groups={[
-        PLUS_GROUP,
-        FREE_GROUP,
-        LONG_GROUP,
+        OLLAMA_GROUP,
+        LMSTUDIO_GROUP,
+        CUSTOM_GROUP,
         {
-          ...LONG_GROUP,
+          ...CUSTOM_GROUP,
           key: "none",
-          label: "Groq",
-          rows: LONG_GROUP.rows.map((row) => ({ ...row, enabled: false })),
+          label: "Custom endpoint (empty)",
+          rows: CUSTOM_GROUP.rows.map((row) => ({ ...row, enabled: false })),
         },
       ]}
-      defaultOpenGroupKey={PLUS_GROUP.key}
+      defaultOpenGroupKey={OLLAMA_GROUP.key}
     />
   ),
 };
@@ -101,49 +116,6 @@ export const Empty: StoryObj<ModelEnableListProps> = {
   render: () => <Controlled groups={[]} />,
 };
 
-export const LockedCopilotCatalog: StoryObj<ModelEnableListProps> = {
-  args: {
-    groups: [
-      {
-        key: "locked:copilot-plus",
-        label: "Copilot",
-        badge: "privacy",
-        tooltip: "Copilot license required",
-        highlight: true,
-        rows: [
-          {
-            id: "__locked_copilot__copilot-plus-flash",
-            label: "Copilot Plus Flash",
-            description: "The default model: fastest responses and the most quota.",
-            enabled: false,
-            locked: true,
-          },
-          {
-            id: "__locked_copilot__deepseek-v4-pro",
-            label: "DeepSeek V4 Pro",
-            description: "A top-tier model for the hardest reasoning and agentic tasks.",
-            enabled: false,
-            locked: true,
-          },
-          {
-            id: "__locked_copilot__glm-5.2",
-            label: "GLM-5.2",
-            description:
-              "A long-horizon frontier open model that beats some of the best closed models.",
-            enabled: false,
-            locked: true,
-          },
-        ],
-      },
-      {
-        key: "byok:openrouter",
-        label: "OpenRouter",
-        badge: "BYOK",
-        rows: [
-          { id: "or-1", label: "google/gemini-3.5-flash", enabled: true },
-          { id: "or-2", label: "qwen3-30b-a3b-thinking-2507", enabled: false },
-        ],
-      },
-    ],
-  },
+export const UnreachableProvider: StoryObj<ModelEnableListProps> = {
+  render: () => <Controlled groups={[UNREACHABLE_GROUP, OLLAMA_GROUP]} />,
 };

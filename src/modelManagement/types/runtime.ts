@@ -21,7 +21,6 @@ export type EnabledBackendEntry =
       state: "ok";
       configuredModel: ConfiguredModel;
       provider: Provider;
-      needsSelfHostWarning?: boolean;
     }
   | {
       configuredModelId: string;

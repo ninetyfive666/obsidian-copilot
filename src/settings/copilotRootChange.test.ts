@@ -126,7 +126,6 @@ describe("copilotRootChange", () => {
   describe("applyCopilotRootChange()", () => {
     it("commits the new root and appends it to the root history", async () => {
       seedSettings({
-        enableMiyo: true,
         copilotFolder: "ai",
         copilotRootHistory: ["copilot", "ai"],
       });

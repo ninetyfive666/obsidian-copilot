@@ -9,9 +9,6 @@ const disableModel = jest.fn().mockResolvedValue(undefined);
 let models: ConfiguredModel[];
 let providers: Record<string, Provider>;
 let backends: Record<string, BackendConfig>;
-jest.mock("@/agentMode", () => {
-  throw new Error("Mobile model controls must not initialize desktop agents");
-});
 jest.mock("@/logger", () => ({ logError: jest.fn() }));
 jest.mock("@/settings/model", () => ({ settingsStore: {} }));
 jest.mock("@/modelManagement", () => ({
@@ -33,46 +30,46 @@ describe("ChatModelEnableList", () => {
     beforeEach(() => {
       jest.clearAllMocks();
       providers = {
-        byok: {
-          providerId: "byok",
-          displayName: "OpenAI",
+        ollama: {
+          providerId: "ollama",
+          displayName: "Ollama",
           providerType: "openai-compatible",
-          origin: { kind: "byok", catalogProviderId: "openai" },
+          origin: { kind: "byok", catalogProviderId: "ollama" },
           addedAt: 0,
         },
-        agent: {
-          providerId: "agent",
-          displayName: "Codex",
+        lmstudio: {
+          providerId: "lmstudio",
+          displayName: "LM Studio",
           providerType: "openai-compatible",
-          origin: { kind: "agent", agentType: "codex" },
+          origin: { kind: "byok", catalogProviderId: "lmstudio" },
           addedAt: 0,
         },
       };
       models = [
         {
           configuredModelId: "a",
-          providerId: "byok",
+          providerId: "ollama",
           info: { id: "model-a", displayName: "Model A" },
           configuredAt: 0,
         },
         {
           configuredModelId: "b",
-          providerId: "byok",
+          providerId: "lmstudio",
           info: { id: "model-b", displayName: "Model B" },
           configuredAt: 0,
         },
         {
-          configuredModelId: "agent",
-          providerId: "agent",
-          info: { id: "agent-model", displayName: "Agent model" },
+          configuredModelId: "embed",
+          providerId: "ollama",
+          info: { id: "embed-model", displayName: "Embed model", isEmbedding: true },
           configuredAt: 0,
         },
       ];
       backends = { chat: { enabledModels: ["a"] } };
     });
-    it("lists only non-agent models and enables or disables one per switch click without desktop agents (https://github.com/Brevilabs/obsidian-copilot-private/issues/373)", () => {
+    it("lists only chat models, skipping embedding models, and enables or disables one per switch click", () => {
       render(<ChatModelEnableList />);
-      expect(screen.queryByText("Agent model")).toBeNull();
+      expect(screen.queryByText("Embed model")).toBeNull();
       fireEvent.click(screen.getAllByRole("switch")[0]);
       fireEvent.click(screen.getAllByRole("switch")[1]);
       expect(disableModel).toHaveBeenCalledWith("chat", "a");

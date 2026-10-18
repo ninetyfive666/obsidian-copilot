@@ -13,7 +13,6 @@ import type { WebTabContext } from "@/types/message";
 import { ChatControls } from "@/components/chat-components/ChatControls";
 import ChatInput from "@/components/chat-components/ChatModeInput";
 import ChatMessages, { isChatEmpty } from "@/components/chat-components/ChatMessages";
-import { AgentModeBanner } from "@/components/chat-components/ui/AgentModeBanner";
 import { useChatModelPicker } from "@/components/chat-components/useChatModelPicker";
 import {
   ABORT_REASON,
@@ -673,7 +672,12 @@ const ChatInternal: React.FC<ChatProps & { chatInput: ReturnType<typeof useChatI
       <div className="tw-flex tw-size-full tw-flex-col tw-overflow-hidden">
         {isChatEmpty(chatHistory, currentAiMessage) && (
           <div className="tw-mx-auto tw-flex tw-w-full tw-max-w-lg tw-flex-1 tw-items-center tw-px-4">
-            <AgentModeBanner onOpenAgent={safeAsyncHandler(() => plugin.activateAgentView())} />
+            <div className="tw-flex tw-flex-col tw-items-center tw-gap-2 tw-text-center">
+              <span className="tw-text-lg tw-font-semibold tw-text-normal">Copilot</span>
+              <span className="tw-text-sm tw-text-muted">
+                Ask about your notes — @ to add context, / for custom prompts
+              </span>
+            </div>
           </div>
         )}
         <ChatMessages

@@ -37,7 +37,7 @@ import type { CopilotSettings } from "@/settings/model";
 import type { CustomModel } from "@/aiParams";
 import { KeychainService, isSecretKey } from "./keychainService";
 
-function makeSettings(overrides: Partial<CopilotSettings> = {}): CopilotSettings {
+function makeSettings(overrides: Record<string, unknown> = {}): CopilotSettings {
   return {
     activeModels: [],
     ...overrides,
@@ -162,7 +162,7 @@ describe("keychainService", () => {
           makeSettings({ openAIApiKey: "leftover-from-disk" })
         );
 
-        expect(result.settings.openAIApiKey).toBe("");
+        expect((result.settings as unknown as Record<string, string>).openAIApiKey).toBe("");
         expect(result.hadFailures).toBe(false);
         expect(secretStorage.setSecret).not.toHaveBeenCalled();
       });
@@ -176,7 +176,7 @@ describe("keychainService", () => {
           makeSettings({ openAIApiKey: "stale-disk-value" })
         );
 
-        expect(result.settings.openAIApiKey).toBe("kc-value");
+        expect((result.settings as unknown as Record<string, string>).openAIApiKey).toBe("kc-value");
         expect(secretStorage.setSecret).not.toHaveBeenCalled();
       });
 
@@ -187,7 +187,7 @@ describe("keychainService", () => {
 
         const result = await service.hydrateFromKeychain(makeSettings({ openAIApiKey: "" }));
 
-        expect(result.settings.openAIApiKey).toBe("");
+        expect((result.settings as unknown as Record<string, string>).openAIApiKey).toBe("");
         expect(result.hadFailures).toBe(false);
         expect(secretStorage.setSecret).not.toHaveBeenCalled();
       });
@@ -217,21 +217,6 @@ describe("keychainService", () => {
         );
 
         expect(result.settings.activeModels[0].apiKey).toBe("kc-model-key");
-        expect(secretStorage.setSecret).not.toHaveBeenCalled();
-      });
-
-      it("hydrates canonical top-level secret fields even when missing from input settings", async () => {
-        const secretStorage = makeSecretStorage();
-        secretStorage.getSecret.mockImplementation((id: string) =>
-          id.endsWith("open-a-i-api-key") ? "sk-recovered" : null
-        );
-        const service = KeychainService.getInstance(makeApp({ secretStorage }));
-
-        const result = await service.hydrateFromKeychain(makeSettings());
-
-        expect((result.settings as unknown as Record<string, string>).openAIApiKey).toBe(
-          "sk-recovered"
-        );
         expect(secretStorage.setSecret).not.toHaveBeenCalled();
       });
 
@@ -281,9 +266,9 @@ describe("keychainService", () => {
         expect(result.keychainIdsToDelete.some((id) => id.includes("model-api-key-chat"))).toBe(
           true
         );
-        expect(current.openAIApiKey).toBe("sk-current");
+        expect((current as unknown as Record<string, string>).openAIApiKey).toBe("sk-current");
         expect(current.activeModels[0].apiKey).toBe("chat-secret");
-        expect(prev.openAIApiKey).toBe("sk-prev");
+        expect((prev as unknown as Record<string, string>).openAIApiKey).toBe("sk-prev");
         expect(prev.activeModels[0].apiKey).toBe("chat-prev");
       });
     });

@@ -17,11 +17,12 @@ jest.mock(
     shouldIndexFile: jest.fn(() => true),
   })
 );
-jest.mock("@/LLMProviders/brevilabsClient", () => ({
-  BrevilabsClient: { getInstance: jest.fn() },
+jest.mock("@/logger", () => ({
+  logInfo: jest.fn(),
+  logWarn: jest.fn(),
+  logError: jest.fn(),
 }));
 
-import { BrevilabsClient } from "@/LLMProviders/brevilabsClient";
 import { getCachedProjectRecordById } from "@/projects/state";
 import { shouldIndexFile } from "@/search/searchUtils";
 import {
@@ -32,7 +33,6 @@ import {
 
 const getRecord = getCachedProjectRecordById as jest.Mock;
 const indexFile = shouldIndexFile as jest.Mock;
-const getClient = BrevilabsClient.getInstance as jest.Mock;
 
 const CWD = "/vault/Proj";
 
@@ -64,7 +64,15 @@ function record(contextSource: Record<string, string | undefined>, id = "p1") {
 
 const flushMicrotasks = () => new Promise((resolve) => window.setTimeout(resolve, 0));
 
-function fakeApp(files: Array<{ path: string; ext: string }> = [], folders: string[] = []): App {
+function textBytes(value: string): ArrayBuffer {
+  return new TextEncoder().encode(value).buffer as ArrayBuffer;
+}
+
+function fakeApp(
+  files: Array<{ path: string; ext: string }> = [],
+  folders: string[] = [],
+  readBinary: () => Promise<ArrayBuffer> = async () => new ArrayBuffer(4)
+): App {
   const tfiles = files.map((f) => ({
     path: f.path,
     extension: f.ext,
@@ -83,7 +91,7 @@ function fakeApp(files: Array<{ path: string; ext: string }> = [], folders: stri
       getFiles: () => tfiles,
       getMarkdownFiles: () => tfiles.filter((f) => f.extension === "md"),
       getAbstractFileByPath: (p: string) => (folderSet.has(p) ? new Folder(p) : null),
-      readBinary: jest.fn(async () => new ArrayBuffer(4)),
+      readBinary,
     },
   } as unknown as App;
 }
@@ -92,11 +100,6 @@ beforeEach(() => {
   mockFs = memFs();
   jest.clearAllMocks();
   indexFile.mockReturnValue(true);
-  getClient.mockReturnValue({
-    url4llm: jest.fn(async () => ({ response: "url text" })),
-    youtube4llm: jest.fn(async () => ({ response: { transcript: "yt text" } })),
-    docs4llm: jest.fn(async () => ({ response: "pdf text" })),
-  });
 });
 
 describe("projectContextMaterializer", () => {
@@ -118,16 +121,14 @@ describe("projectContextMaterializer", () => {
       expect(mockFs.files.size).toBe(0);
     });
 
-    it("materializes a web URL into the shared remotes dir and inlines it in the context block", async () => {
+    it("declares web URLs in the block without writing snapshots when remote fetching is unavailable", async () => {
       getRecord.mockReturnValue(record({ webUrls: "https://example.com" }));
       const result = await ensureProjectContextMaterialized(fakeApp(), "p1", CWD);
 
       expect(result.projectContextBlock).toContain("<project_context>");
       expect(result.projectContextBlock).toContain("https://example.com");
+      expect([...mockFs.files.keys()].some((k) => k.startsWith("remotes/web-"))).toBe(false);
       expect([...mockFs.files.keys()].some((k) => k.endsWith("CONTEXT.md"))).toBe(false);
-      const cacheFile = [...mockFs.files.keys()].find((k) => k.startsWith("remotes/web-"));
-      expect(cacheFile).toBeDefined();
-      expect(mockFs.files.get(cacheFile!)).toContain("url text");
     });
 
     it("reports only out-of-cwd folder inclusions as additional directories", async () => {
@@ -204,23 +205,41 @@ describe("projectContextMaterializer", () => {
       expect(result.projectContextBlock).not.toContain("## Included notes");
     });
 
-    it("materializes in-vault PDFs but ignores markdown files", async () => {
+    it("materializes in-vault files as local text but ignores markdown files", async () => {
       getRecord.mockReturnValue(record({ inclusions: "Proj" }));
-      const app = fakeApp([
-        { path: "Proj/a.pdf", ext: "pdf" },
-        { path: "Proj/note.md", ext: "md" },
-      ]);
+      const app = fakeApp(
+        [
+          { path: "Proj/a.pdf", ext: "pdf" },
+          { path: "Proj/note.md", ext: "md" },
+        ],
+        [],
+        async () => textBytes("pdf text")
+      );
 
       await ensureProjectContextMaterialized(app, "p1", CWD);
 
-      const client = getClient.mock.results[0].value as { docs4llm: jest.Mock };
-      expect(client.docs4llm).toHaveBeenCalledTimes(1);
-      expect([...mockFs.files.keys()].some((k) => k.includes("/file-"))).toBe(true);
+      const snapshots = [...mockFs.files.keys()].filter((k) => k.includes("/file-"));
+      expect(snapshots).toHaveLength(1);
+      expect(mockFs.files.get(snapshots[0])).toContain("pdf text");
+    });
+
+    it("reports binary in-vault files as unsupported offline instead of snapshotting them", async () => {
+      getRecord.mockReturnValue(record({ inclusions: "Proj" }));
+      const app = fakeApp([{ path: "Proj/a.pdf", ext: "pdf" }], [], async () => new ArrayBuffer(4));
+
+      const progress: ContextMaterializeProgress[] = [];
+      await ensureProjectContextMaterialized(app, "p1", CWD, (p) => progress.push(p));
+
+      expect([...mockFs.files.keys()].some((k) => k.includes("/file-"))).toBe(false);
+      const failures = progress.find((p) => p.phase === "failures");
+      if (failures?.phase !== "failures") throw new Error("expected failures progress");
+      expect(failures.failures).toHaveLength(1);
+      expect(failures.failures[0].error).toContain("Unsupported");
     });
 
     it("reports resolve + per-loop progress through onProgress", async () => {
       getRecord.mockReturnValue(record({ inclusions: "Proj", webUrls: "https://example.com" }));
-      const app = fakeApp([{ path: "Proj/a.pdf", ext: "pdf" }]);
+      const app = fakeApp([{ path: "Proj/a.pdf", ext: "pdf" }], [], async () => textBytes("pdf text"));
 
       const progress: ContextMaterializeProgress[] = [];
       await ensureProjectContextMaterialized(app, "p1", CWD, (p) => progress.push(p));
@@ -228,22 +247,6 @@ describe("projectContextMaterializer", () => {
       expect(progress[0]).toEqual({ phase: "resolve", resolved: 1 });
       expect(progress).toContainEqual({ phase: "prefetch", done: 1, total: 1 });
       expect(progress).toContainEqual({ phase: "parse", done: 1, total: 1 });
-    });
-
-    it("resolves with the declared URL listed and no snapshot written when its fetch fails", async () => {
-      getRecord.mockReturnValue(record({ webUrls: "https://broken.com" }));
-      getClient.mockReturnValue({
-        url4llm: jest.fn(async () => {
-          throw new Error("network down");
-        }),
-        youtube4llm: jest.fn(),
-        docs4llm: jest.fn(),
-      });
-
-      const result = await ensureProjectContextMaterialized(fakeApp(), "p1", CWD);
-      expect(result.projectContextBlock).toContain("https://broken.com");
-      expect([...mockFs.files.keys()].some((k) => k.startsWith("remotes/web-"))).toBe(false);
-      expect([...mockFs.files.keys()].some((k) => k.endsWith("CONTEXT.md"))).toBe(false);
     });
 
     it("returns the unavailable-context block when a cache filesystem write throws", async () => {
@@ -260,111 +263,128 @@ describe("projectContextMaterializer", () => {
     });
 
     it("dedupes concurrent calls for the same project to one run", async () => {
-      getRecord.mockReturnValue(record({ webUrls: "https://a.com" }));
-      const app = fakeApp();
+      getRecord.mockReturnValue(record({ inclusions: "Proj" }));
+      let release!: () => void;
+      const gate = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      const readBinary = jest.fn(async () => {
+        await gate;
+        return textBytes("content");
+      });
+      const app = fakeApp([{ path: "Proj/a.pdf", ext: "pdf" }], [], readBinary);
 
       const [r1, r2] = await Promise.all([
         ensureProjectContextMaterialized(app, "p1", CWD),
         ensureProjectContextMaterialized(app, "p1", CWD),
       ]);
 
-      const client = getClient.mock.results[0].value as { url4llm: jest.Mock };
-      expect(client.url4llm).toHaveBeenCalledTimes(1);
+      expect(readBinary).toHaveBeenCalledTimes(1);
       expect(r1).toBe(r2);
     });
 
     it("does not serialize different projects with DIFFERENT sources", async () => {
-      getRecord.mockImplementation((id: string) =>
-        record({ webUrls: id === "p1" ? "https://p1.com" : "https://p2.com" }, id)
-      );
+      getRecord.mockImplementation((id: string) => record({ inclusions: "Proj" }, id));
+      const readBinaryP1 = jest.fn(async () => textBytes("p1 text"));
+      const readBinaryP2 = jest.fn(async () => textBytes("p2 text"));
 
       await Promise.all([
-        ensureProjectContextMaterialized(fakeApp(), "p1", "/vault/P1"),
-        ensureProjectContextMaterialized(fakeApp(), "p2", "/vault/P2"),
+        ensureProjectContextMaterialized(
+          fakeApp([{ path: "P1/a.pdf", ext: "pdf" }], [], readBinaryP1),
+          "p1",
+          "/vault/P1"
+        ),
+        ensureProjectContextMaterialized(
+          fakeApp([{ path: "P2/b.pdf", ext: "pdf" }], [], readBinaryP2),
+          "p2",
+          "/vault/P2"
+        ),
       ]);
 
-      const client = getClient.mock.results[0].value as { url4llm: jest.Mock };
-      expect(client.url4llm).toHaveBeenCalledTimes(2);
+      expect(readBinaryP1).toHaveBeenCalledTimes(1);
+      expect(readBinaryP2).toHaveBeenCalledTimes(1);
     });
 
-    it("dedupes two projects converting the SAME url to a single fetch (global per-artifact lock)", async () => {
-      getRecord.mockImplementation((id: string) => record({ webUrls: "https://shared.com" }, id));
+    it("dedupes two projects converting the SAME file to a single parse (global per-artifact lock)", async () => {
+      getRecord.mockImplementation((id: string) => record({ inclusions: "Proj" }, id));
       let release!: () => void;
       const gate = new Promise<void>((resolve) => {
         release = resolve;
       });
       let calls = 0;
-      const url4llm = jest.fn(async () => {
+      const readBinary = jest.fn(async () => {
         calls += 1;
         await gate;
-        return { response: `content #${calls}` };
+        return textBytes(`content #${calls}`);
       });
-      getClient.mockReturnValue({ url4llm, youtube4llm: jest.fn(), docs4llm: jest.fn() });
 
-      const a = ensureProjectContextMaterialized(fakeApp(), "pA", "/vault/PA");
+      const a = ensureProjectContextMaterialized(
+        fakeApp([{ path: "Proj/shared.pdf", ext: "pdf" }], [], readBinary),
+        "pA",
+        "/vault/PA"
+      );
       await flushMicrotasks();
-      const b = ensureProjectContextMaterialized(fakeApp(), "pB", "/vault/PB");
+      const b = ensureProjectContextMaterialized(
+        fakeApp([{ path: "Proj/shared.pdf", ext: "pdf" }], [], readBinary),
+        "pB",
+        "/vault/PB"
+      );
       await flushMicrotasks();
       release();
       await Promise.all([a, b]);
 
-      expect(url4llm).toHaveBeenCalledTimes(1);
-      const snapshots = [...mockFs.files.keys()].filter((k) => k.startsWith("remotes/web-"));
+      expect(readBinary).toHaveBeenCalledTimes(1);
+      const snapshots = [...mockFs.files.keys()].filter((k) => k.includes("/file-"));
       expect(snapshots).toHaveLength(1);
       expect(mockFs.files.get(snapshots[0])).toContain("content #1");
     });
 
     it("clears the in-flight entry so a later call re-evaluates fresh state", async () => {
-      const app = fakeApp();
-      getRecord.mockReturnValue(record({ webUrls: "https://a.com" }));
-      await ensureProjectContextMaterialized(app, "p1", CWD);
+      getRecord.mockReturnValue(record({ inclusions: "Proj" }));
+      const appA = fakeApp([{ path: "Proj/a.pdf", ext: "pdf" }], [], async () => textBytes("A"));
+      await ensureProjectContextMaterialized(appA, "p1", CWD);
 
-      getRecord.mockReturnValue(record({ webUrls: "https://b.com" }));
-      await ensureProjectContextMaterialized(app, "p1", CWD);
+      const appB = fakeApp([{ path: "Proj/b.pdf", ext: "pdf" }], [], async () => textBytes("B"));
+      await ensureProjectContextMaterialized(appB, "p1", CWD);
 
-      const client = getClient.mock.results[0].value as { url4llm: jest.Mock };
-      expect(client.url4llm).toHaveBeenCalledWith("https://b.com");
-      expect(client.url4llm).toHaveBeenCalledTimes(2);
+      expect(appA.vault.readBinary).toHaveBeenCalledTimes(1);
+      expect(appB.vault.readBinary).toHaveBeenCalledTimes(1);
     });
 
     it("supersedes an in-flight run whose source set was edited (a later caller must not join the stale run)", async () => {
-      const app = fakeApp();
-      getRecord.mockReturnValue(record({ webUrls: "https://a.com" }));
+      getRecord.mockReturnValue(record({ inclusions: "Proj" }));
       let release!: () => void;
       const gate = new Promise<void>((resolve) => {
         release = resolve;
       });
-      const url4llm = jest.fn(async (url: string) => {
-        if (url === "https://a.com") await gate;
-        return { response: url === "https://a.com" ? "A text" : "B text" };
+      const readBinary = jest.fn(async () => {
+        await gate;
+        return textBytes("A text");
       });
-      getClient.mockReturnValue({ url4llm, youtube4llm: jest.fn(), docs4llm: jest.fn() });
+      const app = fakeApp([{ path: "Proj/a.pdf", ext: "pdf" }], [], readBinary);
 
       const a = ensureProjectContextMaterialized(app, "p1", CWD);
       await flushMicrotasks();
-
-      getRecord.mockReturnValue(record({ webUrls: "https://b.com" }));
-      const b = ensureProjectContextMaterialized(app, "p1", CWD);
+      const appB = fakeApp([{ path: "Proj/b.pdf", ext: "pdf" }], [], async () => textBytes("B text"));
+      const b = ensureProjectContextMaterialized(appB, "p1", CWD);
 
       release();
       const [aRes, bRes] = await Promise.all([a, b]);
 
       expect(bRes).not.toBe(aRes);
-      expect(url4llm).toHaveBeenCalledWith("https://b.com");
     });
 
     it("supersedes an in-flight run when a caller passes a NEWER revisionKey (same config signature)", async () => {
-      const app = fakeApp();
-      getRecord.mockReturnValue(record({ webUrls: "https://a.com" }));
+      getRecord.mockReturnValue(record({ inclusions: "Proj" }));
       let release!: () => void;
       const gate = new Promise<void>((resolve) => {
         release = resolve;
       });
-      const url4llm = jest.fn(async (url: string) => {
+      const readBinary = jest.fn(async () => {
         await gate;
-        return { response: `${url} text` };
+        return textBytes("A text");
       });
-      getClient.mockReturnValue({ url4llm, youtube4llm: jest.fn(), docs4llm: jest.fn() });
+      const app = fakeApp([{ path: "Proj/a.pdf", ext: "pdf" }], [], readBinary);
 
       const a = ensureProjectContextMaterialized(app, "p1", CWD, undefined, undefined, "sig#0");
       await flushMicrotasks();
@@ -376,42 +396,29 @@ describe("projectContextMaterializer", () => {
       expect(bRes).not.toBe(aRes);
     });
 
-    it("cheap-skips a known-bad source on the next automatic run (no re-fetch)", async () => {
-      const app = fakeApp();
-      getRecord.mockReturnValue(record({ webUrls: "https://a.com" }));
-      const url4llm = jest.fn(async () => {
-        throw new Error("network down");
-      });
-      getClient.mockReturnValue({ url4llm, youtube4llm: jest.fn(), docs4llm: jest.fn() });
+    it("cheap-skips a known-bad source on the next automatic run (no re-parse)", async () => {
+      getRecord.mockReturnValue(record({ inclusions: "Proj" }));
+      const app = fakeApp([{ path: "Proj/a.pdf", ext: "pdf" }], [], async () => new ArrayBuffer(4));
+      const readBinary = app.vault.readBinary as jest.Mock;
 
       await ensureProjectContextMaterialized(app, "p1", CWD);
-      expect([...mockFs.files.keys()].some((k) => k.includes("failed-web-"))).toBe(true);
+      expect([...mockFs.files.keys()].some((k) => k.includes("failed-file-"))).toBe(true);
 
       const progress: ContextMaterializeProgress[] = [];
       await ensureProjectContextMaterialized(app, "p1", CWD, (p) => progress.push(p));
 
-      expect(url4llm).toHaveBeenCalledTimes(1);
+      expect(readBinary).toHaveBeenCalledTimes(1);
       const failures = progress.find((p) => p.phase === "failures");
       expect(failures?.phase === "failures" && failures.failures).toHaveLength(1);
     });
 
     it("a forced retry supersedes an in-flight non-forced run and later callers join the forced run", async () => {
-      const app = fakeApp();
-
-      getRecord.mockReturnValue(record({ webUrls: "https://a.com" }));
-      getClient.mockReturnValue({
-        url4llm: jest.fn(async () => {
-          throw new Error("down");
-        }),
-        youtube4llm: jest.fn(),
-        docs4llm: jest.fn(),
-      });
+      getRecord.mockReturnValue(record({ inclusions: "Proj" }));
+      const app = fakeApp([{ path: "Proj/a.pdf", ext: "pdf" }], [], async () => new ArrayBuffer(4));
       await ensureProjectContextMaterialized(app, "p1", CWD);
-      expect([...mockFs.files.keys()].some((k) => k.includes("failed-web-"))).toBe(true);
+      expect([...mockFs.files.keys()].some((k) => k.includes("failed-file-"))).toBe(true);
 
-      getRecord.mockReturnValue(record({ webUrls: "https://a.com\nhttps://b.com" }));
-      const url4llm = jest.fn(async (url: string) => ({ response: url === "https://a.com" ? "A recovered" : "B text" })); // prettier-ignore
-      getClient.mockReturnValue({ url4llm, youtube4llm: jest.fn(), docs4llm: jest.fn() });
+      app.vault.readBinary = jest.fn(async () => textBytes("A recovered"));
 
       const warm = ensureProjectContextMaterialized(app, "p1", CWD);
       const forced = ensureProjectContextMaterialized(app, "p1", CWD, undefined, true);
@@ -421,77 +428,83 @@ describe("projectContextMaterializer", () => {
       expect(joinerRes).toBe(forcedRes);
       expect(joinerRes).not.toBe(warmRes);
 
-      expect(url4llm).toHaveBeenCalledWith("https://a.com");
       const snapshotA = [...mockFs.files.keys()].find(
-        (k) => k.includes("/web-") && mockFs.files.get(k)!.includes("A recovered")
+        (k) => k.includes("/file-") && mockFs.files.get(k)!.includes("A recovered")
       );
       expect(snapshotA).toBeDefined();
-      expect([...mockFs.files.keys()].some((k) => k.includes("failed-web-"))).toBe(false);
+      expect([...mockFs.files.keys()].some((k) => k.includes("failed-file-"))).toBe(false);
     });
   });
 
   describe("materializeProjectContextSource()", () => {
     it("retries a source past its failure marker and clears the marker once it succeeds", async () => {
-      const app = fakeApp();
-      getRecord.mockReturnValue(record({ webUrls: "https://a.com" }));
-      const url4llm = jest.fn(async (): Promise<{ response: string }> => {
-        throw new Error("network down");
-      });
-      getClient.mockReturnValue({ url4llm, youtube4llm: jest.fn(), docs4llm: jest.fn() });
+      getRecord.mockReturnValue(record({ inclusions: "Proj" }));
+      const app = fakeApp([{ path: "Proj/a.pdf", ext: "pdf" }], [], async () => new ArrayBuffer(4));
       await ensureProjectContextMaterialized(app, "p1", CWD);
-      expect(url4llm).toHaveBeenCalledTimes(1);
 
-      url4llm.mockResolvedValueOnce({ response: "recovered" });
+      app.vault.readBinary = jest.fn(async () => textBytes("recovered"));
       const failures = await materializeProjectContextSource(app, "p1", {
-        kind: "web",
-        source: "https://a.com",
+        kind: "file",
+        source: "Proj/a.pdf",
       });
 
-      expect(url4llm).toHaveBeenCalledTimes(2);
       expect(failures).toHaveLength(0);
-      const snapshot = [...mockFs.files.keys()].find((k) => k.includes("/web-"));
+      const snapshot = [...mockFs.files.keys()].find((k) => k.includes("/file-"));
       expect(mockFs.files.get(snapshot!)).toContain("recovered");
-      expect([...mockFs.files.keys()].some((k) => k.includes("failed-web-"))).toBe(false);
+      expect([...mockFs.files.keys()].some((k) => k.includes("failed-file-"))).toBe(false);
     });
 
-    it("a concurrent full run neither refetches nor overwrites a single-source retry of the same URL", async () => {
-      const app = fakeApp();
-      getRecord.mockReturnValue(record({ webUrls: "https://a.com" }));
-
-      getClient.mockReturnValue({
-        url4llm: jest.fn(async () => {
-          throw new Error("down");
-        }),
-        youtube4llm: jest.fn(),
-        docs4llm: jest.fn(),
-      });
+    it("a concurrent full run neither re-parses nor overwrites a single-source retry of the same file", async () => {
+      getRecord.mockReturnValue(record({ inclusions: "Proj" }));
+      const app = fakeApp([{ path: "Proj/a.pdf", ext: "pdf" }], [], async () => new ArrayBuffer(4));
       await ensureProjectContextMaterialized(app, "p1", CWD);
-      expect([...mockFs.files.keys()].some((k) => k.includes("failed-web-"))).toBe(true);
+      expect([...mockFs.files.keys()].some((k) => k.includes("failed-file-"))).toBe(true);
 
-      let releaseFetch!: () => void;
+      let releaseParse!: () => void;
       const gate = new Promise<void>((resolve) => {
-        releaseFetch = resolve;
+        releaseParse = resolve;
       });
-      const url4llm = jest.fn(async () => {
+      const readBinary = jest.fn(async () => {
         await gate;
-        return { response: "recovered" };
+        return textBytes("recovered");
       });
-      getClient.mockReturnValue({ url4llm, youtube4llm: jest.fn(), docs4llm: jest.fn() });
+      app.vault.readBinary = readBinary;
 
-      const retry = materializeProjectContextSource(app, "p1", { kind: "web", source: "https://a.com" }); // prettier-ignore
+      const retry = materializeProjectContextSource(app, "p1", {
+        kind: "file",
+        source: "Proj/a.pdf",
+      });
       await flushMicrotasks();
 
       const full = ensureProjectContextMaterialized(app, "p1", CWD);
       await flushMicrotasks();
 
-      releaseFetch();
+      releaseParse();
       await Promise.all([retry, full]);
 
-      const snapshot = [...mockFs.files.keys()].find((k) => k.startsWith("remotes/web-"));
+      const snapshot = [...mockFs.files.keys()].find((k) => k.includes("/file-"));
       expect(snapshot).toBeDefined();
       expect(mockFs.files.get(snapshot!)).toContain("recovered");
-      expect([...mockFs.files.keys()].some((k) => k.includes("failed-web-"))).toBe(false);
-      expect(url4llm).toHaveBeenCalledTimes(1);
+      expect([...mockFs.files.keys()].some((k) => k.includes("failed-file-"))).toBe(false);
+      expect(readBinary).toHaveBeenCalledTimes(1);
+    });
+
+    it("reports a remote source as unsupported instead of fetching it", async () => {
+      getRecord.mockReturnValue(record({ webUrls: "https://a.com" }));
+
+      const failures = await materializeProjectContextSource(fakeApp(), "p1", {
+        kind: "web",
+        source: "https://a.com",
+      });
+
+      expect(failures).toEqual([
+        {
+          source: "https://a.com",
+          kind: "web",
+          error: expect.stringMatching(/network access/i),
+          usedStaleSnapshot: false,
+        },
+      ]);
     });
 
     it("returns a Project not found failure for an unknown project", async () => {

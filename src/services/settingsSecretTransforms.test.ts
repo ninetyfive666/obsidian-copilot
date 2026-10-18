@@ -1,4 +1,3 @@
-import { DEFAULT_SETTINGS } from "@/constants";
 import type { CopilotSettings } from "@/settings/model";
 import {
   cleanupLegacyFields,
@@ -7,7 +6,7 @@ import {
   stripKeychainFields,
 } from "@/services/settingsSecretTransforms";
 
-function makeSettings(overrides: Partial<CopilotSettings> = {}): CopilotSettings {
+function makeSettings(overrides: Record<string, unknown> = {}): CopilotSettings {
   return {
     activeModels: [],
     ...overrides,
@@ -83,15 +82,15 @@ describe("settingsSecretTransforms", () => {
       const result = stripKeychainFields(settings);
 
       expect(result).not.toBe(settings);
-      expect(result.openAIApiKey).toBe("");
+      expect((result as unknown as Record<string, string>).openAIApiKey).toBe("");
       expect(result.defaultModelKey).toBe("gpt-4|openai");
       expect(result.activeModels[0].apiKey).toBe("");
-      expect(settings.openAIApiKey).toBe("sk-123");
+      expect((settings as unknown as Record<string, string>).openAIApiKey).toBe("sk-123");
       expect(settings.activeModels[0].apiKey).toBe("chat-secret");
     });
 
     it("preserves sparse settings without adding model arrays", () => {
-      const result = stripKeychainFields({ openAIApiKey: "secret" } as CopilotSettings);
+      const result = stripKeychainFields({ openAIApiKey: "secret" } as unknown as CopilotSettings);
       const record = result as unknown as Record<string, unknown>;
 
       expect(record.openAIApiKey).toBe("");
@@ -115,7 +114,6 @@ describe("settingsSecretTransforms", () => {
         githubCopilotTokenExpiresAt: 1893456000,
         miyoSyncedExclusions: '{"device":"d","url":"","folder":"vault","roots":["copilot"]}',
         agentMode: {
-          ...DEFAULT_SETTINGS.agentMode,
           mcpServers: [
             {
               name: "private",
@@ -144,7 +142,11 @@ describe("settingsSecretTransforms", () => {
       expect(result.miyoSyncedExclusions).toBeUndefined();
       expect((result.agentMode as Record<string, unknown>).mcpServers).toBeUndefined();
       expect(settings as unknown as Record<string, unknown>).toHaveProperty("_keychainOnly", true);
-      expect((settings.agentMode as unknown as Record<string, unknown>).mcpServers).toHaveLength(1);
+      expect(
+        ((settings as unknown as Record<string, unknown>).agentMode as {
+          mcpServers: unknown[];
+        }).mcpServers
+      ).toHaveLength(1);
     });
   });
 });

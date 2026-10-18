@@ -1,4 +1,4 @@
-import { looksLikeEmbeddingModel } from "@/modelManagement/catalog/catalogTransform";
+import { looksLikeEmbeddingModel } from "@/modelManagement/catalog/builtinDefinitions";
 import type { ModelManagementApi } from "@/modelManagement/createModelManagement";
 import { listProviderModels } from "@/modelManagement/providers/adapters/listProviderModels";
 import type { ModelInfo, ProviderType } from "@/modelManagement/types/catalog";
@@ -11,7 +11,6 @@ export interface UseModelCandidatePoolArgs {
   providerType: ProviderType | undefined;
   effectiveBaseUrl: string;
   existingModels: readonly ConfiguredModel[];
-  catalogMetadata: Record<string, ModelInfo>;
   apiKey: string;
   extras: Record<string, unknown>;
   requiresApiKey: boolean;
@@ -40,7 +39,6 @@ export function useModelCandidatePool({
   providerType,
   effectiveBaseUrl,
   existingModels,
-  catalogMetadata,
   apiKey,
   extras,
   requiresApiKey,
@@ -63,14 +61,13 @@ export function useModelCandidatePool({
 
   const resolveModelInfo = useCallback(
     (id: string): ModelInfo =>
-      catalogMetadata[id] ??
       existingByWireId.get(id) ??
       ({
         id,
         displayName: id,
         ...(looksLikeEmbeddingModel(id) ? { isEmbedding: true } : {}),
       } satisfies ModelInfo),
-    [catalogMetadata, existingByWireId]
+    [existingByWireId]
   );
 
   const availableModels = useMemo<readonly ModelInfo[]>(() => {
@@ -95,12 +92,12 @@ export function useModelCandidatePool({
     const fetched = new Set(fetchedIds);
     for (const m of existingModels) {
       if (removedExistingIds.has(m.info.id)) continue;
-      if (!catalogMetadata[m.info.id] && !fetched.has(m.info.id)) {
+      if (!fetched.has(m.info.id)) {
         set.add(m.info.id);
       }
     }
     return set;
-  }, [manualIds, fetchedIds, existingModels, catalogMetadata, removedExistingIds]);
+  }, [manualIds, fetchedIds, existingModels, removedExistingIds]);
 
   const knownIdsRef = useRef<Set<string>>(new Set());
   useEffect(() => {

@@ -1,7 +1,6 @@
 import { logError } from "@/logger";
 import { getSettings, setSettings } from "@/settings/model";
 
-import { providerNeedsSelfHostWarning } from "@/modelManagement/providers/selfHostPolicy";
 import type { BackendConfig, BackendType } from "@/modelManagement/types/persisted";
 import type { EnabledBackendEntry } from "@/modelManagement/types/runtime";
 import type { ConfiguredModelRegistry } from "@/modelManagement/models/ConfiguredModelRegistry";
@@ -72,9 +71,7 @@ export class BackendConfigRegistry {
         ? this.#providers.get(configuredModel.providerId)
         : undefined;
       if (configuredModel && provider) {
-        const needsSelfHostWarning =
-          settings.enableSelfHostMode && providerNeedsSelfHostWarning(provider, settings);
-        return { configuredModelId, state: "ok", configuredModel, provider, needsSelfHostWarning };
+        return { configuredModelId, state: "ok", configuredModel, provider };
       }
       return { configuredModelId, state: "broken" };
     });
