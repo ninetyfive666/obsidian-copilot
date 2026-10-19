@@ -196,6 +196,38 @@ describe("model", () => {
       expect(sanitized.relevantNotesLiveUpdate).toBe(false);
     });
 
+    it("backfills thinking and local embedding defaults for settings written before the fields existed", () => {
+      const withoutFields = { ...DEFAULT_SETTINGS } as unknown as Record<string, unknown>;
+      delete withoutFields.thinkingInChat;
+      delete withoutFields.thinkingInAgent;
+      delete withoutFields.thinkingInCustomCommands;
+      delete withoutFields.useLocalEmbeddings;
+      delete withoutFields.localEmbeddingModelKey;
+
+      const sanitized = sanitizeSettings(withoutFields as unknown as CopilotSettings);
+
+      expect(sanitized.thinkingInChat).toBe(false);
+      expect(sanitized.thinkingInAgent).toBe(true);
+      expect(sanitized.thinkingInCustomCommands).toBe(false);
+      expect(sanitized.useLocalEmbeddings).toBe(false);
+      expect(sanitized.localEmbeddingModelKey).toBe("");
+    });
+
+    it("preserves persisted thinking and embedding choices", () => {
+      const sanitized = sanitizeSettings({
+        ...DEFAULT_SETTINGS,
+        thinkingInChat: true,
+        thinkingInAgent: false,
+        useLocalEmbeddings: true,
+        localEmbeddingModelKey: "nomic-embed-text",
+      });
+
+      expect(sanitized.thinkingInChat).toBe(true);
+      expect(sanitized.thinkingInAgent).toBe(false);
+      expect(sanitized.useLocalEmbeddings).toBe(true);
+      expect(sanitized.localEmbeddingModelKey).toBe("nomic-embed-text");
+    });
+
     it("drops a persisted global output cap so it cannot truncate answers again (https://github.com/logancyang/obsidian-copilot-preview/issues/312)", () => {
       const withRetiredCap = {
         ...DEFAULT_SETTINGS,

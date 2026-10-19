@@ -8,6 +8,7 @@ import {
 } from "@langchain/core/prompts";
 import ChatModelManager from "@/LLMProviders/chatModelManager";
 import { CustomModel } from "@/aiParams";
+import { getSettings } from "@/settings/model";
 
 export function createChatMemory(): BufferMemory {
   return new BufferMemory({
@@ -23,7 +24,7 @@ export async function createChatChain(
 ): Promise<RunnableSequence> {
   const chatModel = await ChatModelManager.getInstance().createModelInstanceFromBridged(
     selectedModel,
-    false
+    getSettings().thinkingInCustomCommands
   );
 
   const defaultSystemPrompt =

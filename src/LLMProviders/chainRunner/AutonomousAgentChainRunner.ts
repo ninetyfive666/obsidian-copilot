@@ -248,7 +248,7 @@ export class AutonomousAgentChainRunner extends CopilotPlusChainRunner {
     this.llmFormattedMessages = [];
     this.lastDisplayedContent = "";
 
-    const chatModel = this.chainManager.chatModelManager.getChatModel();
+    const chatModel = this.getAgentChatModel();
     const adapter = ModelAdapterFactory.createAdapter(chatModel);
     const thinkStreamer = new ThinkBlockStreamer(updateCurrentAiMessage, true);
 

@@ -43,6 +43,7 @@ import {
   resetPersistenceState,
 } from "@/services/settingsPersistence";
 import { UserMemoryManager } from "@/memory/UserMemoryManager";
+import { initLocalEmbeddings } from "@/search/embeddings/localEmbeddingService";
 import { clearRecordedPromptPayload } from "@/LLMProviders/chainRunner/utils/promptPayloadRecorder";
 import {
   getWebViewerService,
@@ -153,6 +154,8 @@ export default class CopilotPlugin extends Plugin {
     logFileManager.setApp(this.app);
 
     this.chainOwner = ChainOwner.getInstance(this.app, this.modelManagement);
+
+    initLocalEmbeddings(this.app, this.modelManagement);
 
     const vaultDataManager = VaultDataManager.getInstance();
     vaultDataManager.initialize(this.app);

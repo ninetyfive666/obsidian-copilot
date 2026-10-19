@@ -61,6 +61,11 @@ export interface CopilotSettings {
   projectList: Array<ProjectConfig>;
   passMarkdownImages: boolean;
   enableAutonomousAgent: boolean;
+  thinkingInChat: boolean;
+  thinkingInAgent: boolean;
+  thinkingInCustomCommands: boolean;
+  useLocalEmbeddings: boolean;
+  localEmbeddingModelKey: string;
   enableCustomPromptTemplating: boolean;
   relevantNotesLiveUpdate: boolean;
   enableLexicalBoosts: boolean;
@@ -374,6 +379,21 @@ export function sanitizeSettings(settings: CopilotSettings): CopilotSettings {
 
   if (typeof sanitizedSettings.enableCustomPromptTemplating !== "boolean") {
     sanitizedSettings.enableCustomPromptTemplating = DEFAULT_SETTINGS.enableCustomPromptTemplating;
+  }
+
+  for (const key of [
+    "thinkingInChat",
+    "thinkingInAgent",
+    "thinkingInCustomCommands",
+    "useLocalEmbeddings",
+  ] as const) {
+    if (typeof sanitizedSettings[key] !== "boolean") {
+      sanitizedSettings[key] = DEFAULT_SETTINGS[key];
+    }
+  }
+
+  if (typeof sanitizedSettings.localEmbeddingModelKey !== "string") {
+    sanitizedSettings.localEmbeddingModelKey = DEFAULT_SETTINGS.localEmbeddingModelKey;
   }
 
   if (!Array.isArray(sanitizedSettings.autonomousAgentEnabledToolIds)) {

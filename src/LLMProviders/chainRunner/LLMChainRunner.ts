@@ -1,6 +1,7 @@
 import { ABORT_REASON } from "@/constants";
 import { LayerToMessagesConverter } from "@/context/LayerToMessagesConverter";
 import { logInfo } from "@/logger";
+import { getSettings } from "@/settings/model";
 import { ChatMessage } from "@/types/message";
 import { withSuppressedTokenWarnings } from "@/utils";
 import { BaseChainRunner } from "./BaseChainRunner";
@@ -64,14 +65,13 @@ export class LLMChainRunner extends BaseChainRunner {
       updateLoading?: (loading: boolean) => void;
     }
   ): Promise<string> {
-    const excludeThinking = true;
-
-    const streamer = new ThinkBlockStreamer(updateCurrentAiMessage, excludeThinking);
+    const thinking = getSettings().thinkingInChat;
+    const streamer = new ThinkBlockStreamer(updateCurrentAiMessage, !thinking);
 
     try {
       const messages = await this.constructMessages(userMessage);
 
-      const chatModel = this.chainManager.chatModelManager.getChatModel(false);
+      const chatModel = this.chainManager.chatModelManager.getChatModel(thinking);
       const modelName = (chatModel as { modelName?: string } | undefined)?.modelName;
       recordPromptPayload({
         messages,

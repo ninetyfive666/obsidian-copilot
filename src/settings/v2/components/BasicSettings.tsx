@@ -33,6 +33,17 @@ import React, { useEffect, useMemo, useState } from "react";
 export const BasicSettings: React.FC = () => {
   const app = useApp();
   const settings = useSettingsValue();
+
+  const embeddingModelOptions = settings.configuredModels
+    .filter((model) => model.info.isEmbedding)
+    .map((model) => {
+      const provider = settings.providers[model.providerId];
+      const providerName = provider ? provider.displayName : "unknown provider";
+      return {
+        label: `${model.info.displayName} (${providerName})`,
+        value: model.configuredModelId,
+      };
+    });
   const [isChecking, setIsChecking] = useState(false);
   const [templateOpen, setTemplateOpen] = useState(false);
   const [conversationNoteName, setConversationNoteName] = useState(
@@ -243,6 +254,56 @@ export const BasicSettings: React.FC = () => {
             </Button>
           </div>
         </SettingItem>
+      </SettingSection>
+
+      <SettingSection label="Thinking & search">
+        <SettingItem
+          type="switch"
+          title="Thinking in chat"
+          description="Reasoning models think before answering in plain chat mode. For direct questions the reasoning usually only adds delay."
+          checked={settings.thinkingInChat}
+          onCheckedChange={(checked) => updateSetting("thinkingInChat", checked)}
+        />
+
+        <SettingItem
+          type="switch"
+          title="Thinking in agent mode"
+          description="Reasoning models plan before calling tools. Recommended to keep enabled."
+          checked={settings.thinkingInAgent}
+          onCheckedChange={(checked) => updateSetting("thinkingInAgent", checked)}
+        />
+
+        <SettingItem
+          type="switch"
+          title="Thinking in custom commands & quick asks"
+          description="One-shot answers to your custom commands and quick asks; reasoning before those usually only adds delay."
+          checked={settings.thinkingInCustomCommands}
+          onCheckedChange={(checked) => updateSetting("thinkingInCustomCommands", checked)}
+        />
+
+        <SettingItem
+          type="switch"
+          title="Semantic search (local embeddings)"
+          description="Indexes your vault with a local embedding model and combines vector results with the lexical search."
+          checked={settings.useLocalEmbeddings}
+          onCheckedChange={(checked) => updateSetting("useLocalEmbeddings", checked)}
+        />
+
+        {settings.useLocalEmbeddings && (
+          <SettingItem
+            type="select"
+            title="Embedding model"
+            description={
+              embeddingModelOptions.length === 0
+                ? "Add an embedding model (for example nomic-embed-text) in the Models tab first."
+                : "Local model used to embed your notes. Changing it rebuilds the index."
+            }
+            value={settings.localEmbeddingModelKey}
+            onChange={(value) => updateSetting("localEmbeddingModelKey", value)}
+            options={embeddingModelOptions}
+            placeholder="No embedding model configured"
+          />
+        )}
       </SettingSection>
 
       <SettingSection label="Custom instructions">

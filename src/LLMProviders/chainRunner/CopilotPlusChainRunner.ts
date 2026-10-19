@@ -464,6 +464,10 @@ Include your extracted terms as: [SALIENT_TERMS: term1, term2, term3]`;
     return this.hasCapability(model, ModelCapability.VISION);
   }
 
+  protected getAgentChatModel(): BaseChatModel {
+    return this.chainManager.chatModelManager.getChatModel(getSettings().thinkingInAgent);
+  }
+
   private appendComposerInstructionsIfNeeded(content: string, userMessage: ChatMessage): string {
     if (!userMessage.message || !userMessage.message.includes("@composer")) {
       return content;
@@ -482,7 +486,7 @@ Include your extracted terms as: [SALIENT_TERMS: term1, term2, term3]`;
   ): Promise<void> {
     const memory = this.chainManager.memoryManager.getMemory();
 
-    const chatModel = this.chainManager.chatModelManager.getChatModel();
+    const chatModel = this.getAgentChatModel();
     const isMultimodalCurrent = this.isMultimodalModel(chatModel);
 
     const messages: { role: string; content: string | MessageContent[] }[] = [];
@@ -586,7 +590,7 @@ Include your extracted terms as: [SALIENT_TERMS: term1, term2, term3]`;
     );
 
     const chatStream = await withSuppressedTokenWarnings(() =>
-      this.chainManager.chatModelManager.getChatModel().stream(messages, {
+      this.getAgentChatModel().stream(messages, {
         signal: abortController.signal,
       })
     );
@@ -620,9 +624,10 @@ Include your extracted terms as: [SALIENT_TERMS: term1, term2, term3]`;
   ): Promise<string> {
     const { updateLoadingMessage } = options;
 
-    const chatModel = this.chainManager.chatModelManager.getChatModel();
+    const thinking = getSettings().thinkingInAgent;
+    const chatModel = this.getAgentChatModel();
     const hasReasoning = this.hasCapability(chatModel, ModelCapability.REASONING);
-    const excludeThinking = !hasReasoning;
+    const excludeThinking = !thinking || !hasReasoning;
 
     const thinkStreamer = new ThinkBlockStreamer(updateCurrentAiMessage, excludeThinking);
     let sources: { title: string; path: string; score: number; explanation?: unknown }[] = [];
@@ -641,7 +646,7 @@ Include your extracted terms as: [SALIENT_TERMS: term1, term2, term3]`;
       const messageForAnalysis = l5User?.text || userMessage.originalMessage || "";
 
       try {
-        const chatModel = this.chainManager.chatModelManager.getChatModel();
+        const chatModel = this.getAgentChatModel();
         // Compacted envelopes merge prior-turn context into one segment, so only
         // current-turn segments may signal an attached active note.
         // https://github.com/logancyang/obsidian-copilot/issues/2456
