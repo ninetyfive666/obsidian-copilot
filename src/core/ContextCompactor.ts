@@ -180,7 +180,7 @@ Summary:`;
       .replace("{path}", item.path)
       .replace("{content}", content);
 
-    const model = this.chatModelManager.getChatModel();
+    const model = this.chatModelManager.getChatModel(false);
     const response = await model.invoke([new HumanMessage(prompt)]);
 
     return typeof response.content === "string" ? response.content.trim() : "";

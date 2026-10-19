@@ -542,7 +542,7 @@ export class ChatPersistenceManager {
     }
 
     try {
-      const chatModel = this.chainManager.chatModelManager.getChatModel();
+      const chatModel = this.chainManager.chatModelManager.getChatModel(false);
       if (!chatModel) {
         return undefined;
       }

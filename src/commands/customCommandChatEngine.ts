@@ -21,8 +21,10 @@ export async function createChatChain(
   systemPrompt: string,
   memory: BaseChatMemory
 ): Promise<RunnableSequence> {
-  const chatModel =
-    await ChatModelManager.getInstance().createModelInstanceFromBridged(selectedModel);
+  const chatModel = await ChatModelManager.getInstance().createModelInstanceFromBridged(
+    selectedModel,
+    false
+  );
 
   const defaultSystemPrompt =
     "You are a helpful assistant. You'll help the user with their content editing needs.";

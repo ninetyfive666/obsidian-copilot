@@ -885,7 +885,7 @@ export default class CopilotPlugin extends Plugin {
     if (getSettings().enableRecentConversations) {
       try {
         const chainManager = this.chainOwner.getCurrentChainManager();
-        const chatModel = chainManager.chatModelManager.getChatModel();
+        const chatModel = chainManager.chatModelManager.getChatModel(false);
         this.userMemoryManager.addRecentConversation(this.chatUIState.getMessages(), chatModel);
       } catch (error) {
         logInfo("Failed to analyze chat messages for memory:", error);

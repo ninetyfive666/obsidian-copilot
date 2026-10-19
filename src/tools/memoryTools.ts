@@ -20,7 +20,7 @@ export const createUpdateMemoryTool = (app: App) =>
     func: async ({ statement }) => {
       try {
         const memoryManager = new UserMemoryManager(app);
-        const chatModel = ChatModelManager.getInstance().getChatModel();
+        const chatModel = ChatModelManager.getInstance().getChatModel(false);
         const result = await memoryManager.updateSavedMemory(statement, chatModel);
 
         if (result.error) {

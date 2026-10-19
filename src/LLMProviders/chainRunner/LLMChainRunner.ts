@@ -1,4 +1,4 @@
-import { ABORT_REASON, ModelCapability } from "@/constants";
+import { ABORT_REASON } from "@/constants";
 import { LayerToMessagesConverter } from "@/context/LayerToMessagesConverter";
 import { logInfo } from "@/logger";
 import { ChatMessage } from "@/types/message";
@@ -64,21 +64,14 @@ export class LLMChainRunner extends BaseChainRunner {
       updateLoading?: (loading: boolean) => void;
     }
   ): Promise<string> {
-    let excludeThinking = false;
-
-    const currentModel = this.chainManager.chatModelManager.getActiveModel();
-    if (currentModel) {
-      excludeThinking = !currentModel.capabilities?.includes(ModelCapability.REASONING);
-    } else {
-      logInfo("Could not determine model capabilities, defaulting to include thinking blocks");
-    }
+    const excludeThinking = true;
 
     const streamer = new ThinkBlockStreamer(updateCurrentAiMessage, excludeThinking);
 
     try {
       const messages = await this.constructMessages(userMessage);
 
-      const chatModel = this.chainManager.chatModelManager.getChatModel();
+      const chatModel = this.chainManager.chatModelManager.getChatModel(false);
       const modelName = (chatModel as { modelName?: string } | undefined)?.modelName;
       recordPromptPayload({
         messages,
@@ -89,7 +82,7 @@ export class LLMChainRunner extends BaseChainRunner {
       logInfo("Final Request to AI:\n", messages);
 
       const chatStream = await withSuppressedTokenWarnings(() =>
-        this.chainManager.chatModelManager.getChatModel().stream(messages as never, {
+        chatModel.stream(messages as never, {
           signal: abortController.signal,
         })
       );

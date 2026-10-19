@@ -37,7 +37,7 @@ const CHAT_PROVIDER_CONSTRUCTORS: Record<string, ChatConstructorType | undefined
 
 export default class ChatModelManager {
   private static instance: ChatModelManager;
-  private static chatModel: BaseChatModel | null;
+  private static bridgedModel: CustomModel | null = null;
   private static activeModel: CustomModel | null = null;
   private static modelMap: Record<
     string,
@@ -45,6 +45,10 @@ export default class ChatModelManager {
       hasApiKey: boolean;
     }
   >;
+  private static instances: {
+    withThinking: BaseChatModel | null;
+    withoutThinking: BaseChatModel | null;
+  } = { withThinking: null, withoutThinking: null };
 
   private readonly providerApiKeyMap: Record<ChatModelProviders, () => string> = {
     [ChatModelProviders.OLLAMA]: () => "default-key",
@@ -67,7 +71,7 @@ export default class ChatModelManager {
     return ChatModelManager.instance;
   }
 
-  private getModelConfig(customModel: CustomModel): Record<string, unknown> {
+  private getModelConfig(customModel: CustomModel, thinking: boolean): Record<string, unknown> {
     const modelName = customModel.name;
     const maxTokens = customModel.maxTokens;
     const openAIFormatIsKeyless = customModel.requiresApiKey === false && !customModel.apiKey;
@@ -92,7 +96,7 @@ export default class ChatModelManager {
           Authorization: `Bearer ${customModel.apiKey || "default-key"}`,
         },
         fetch: customModel.enableCors ? safeFetchNoThrow : undefined,
-        think: customModel.capabilities?.includes(ModelCapability.REASONING) ?? false,
+        think: thinking && (customModel.capabilities?.includes(ModelCapability.REASONING) ?? false),
         repeatPenalty: 1.1,
         numCtx: customModel.numCtx ?? DEFAULT_OLLAMA_NUM_CTX,
       };
@@ -178,11 +182,19 @@ export default class ChatModelManager {
     return constructor;
   }
 
-  getChatModel(): BaseChatModel {
-    if (!ChatModelManager.chatModel) {
+  getChatModel(thinking = true): BaseChatModel {
+    if (!ChatModelManager.bridgedModel) {
       throw new Error("No valid chat model available. Please check your model settings.");
     }
-    return ChatModelManager.chatModel;
+
+    const slot: "withThinking" | "withoutThinking" = thinking ? "withThinking" : "withoutThinking";
+    if (!ChatModelManager.instances[slot]) {
+      ChatModelManager.instances[slot] = this.buildInstance(
+        ChatModelManager.bridgedModel,
+        thinking
+      );
+    }
+    return ChatModelManager.instances[slot];
   }
 
   getActiveModel(): CustomModel | null {
@@ -191,20 +203,33 @@ export default class ChatModelManager {
 
   async setChatModelFromBridged(model: CustomModel): Promise<void> {
     try {
-      ChatModelManager.chatModel = await this.createModelInstanceFromBridged(model);
+      ChatModelManager.bridgedModel = model;
       ChatModelManager.activeModel = model;
+      ChatModelManager.instances = {
+        withThinking: await this.createModelInstanceFromBridged(model, true),
+        withoutThinking: null,
+      };
     } catch (error) {
+      ChatModelManager.bridgedModel = null;
+      ChatModelManager.activeModel = null;
+      ChatModelManager.instances = { withThinking: null, withoutThinking: null };
       logError(error);
       throw error;
     }
   }
 
-  async createModelInstanceFromBridged(model: CustomModel): Promise<BaseChatModel> {
+  async createModelInstanceFromBridged(
+    model: CustomModel,
+    thinking = true
+  ): Promise<BaseChatModel> {
     if (!this.hasProviderCredentials(model)) {
       throw new MissingApiKeyError(`API key is not provided for the model: ${model.name}.`);
     }
+    return this.buildInstance(model, thinking);
+  }
 
-    const constructorConfig = this.getModelConfig(model);
+  private buildInstance(model: CustomModel, thinking: boolean): BaseChatModel {
+    const constructorConfig = this.getModelConfig(model, thinking);
     const Constructor = this.getProviderConstructor(model);
     return new Constructor(constructorConfig);
   }
@@ -213,7 +238,7 @@ export default class ChatModelManager {
     if (chatModel === undefined || chatModel === null) {
       return false;
     }
-    return true;
+    return ChatModelManager.bridgedModel !== null;
   }
 
   private estimateTokens(text: string): number {
@@ -222,11 +247,13 @@ export default class ChatModelManager {
   }
 
   async countTokens(inputStr: string): Promise<number> {
-    return ChatModelManager.chatModel?.getNumTokens(inputStr) ?? this.estimateTokens(inputStr);
+    return ChatModelManager.bridgedModel
+      ? this.getChatModel().getNumTokens(inputStr)
+      : this.estimateTokens(inputStr);
   }
 
   private validateCurrentModel(): void {
-    if (!ChatModelManager.chatModel) return;
+    if (!ChatModelManager.bridgedModel) return;
 
     const currentModelKey = getModelKey();
     if (!currentModelKey) return;
@@ -234,8 +261,9 @@ export default class ChatModelManager {
     const selectedModel = ChatModelManager.modelMap[currentModelKey];
 
     if (selectedModel && !selectedModel.hasApiKey) {
-      ChatModelManager.chatModel = null;
+      ChatModelManager.bridgedModel = null;
       ChatModelManager.activeModel = null;
+      ChatModelManager.instances = { withThinking: null, withoutThinking: null };
       logInfo("Failed to reinitialize model due to missing API key");
     }
   }

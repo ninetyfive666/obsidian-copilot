@@ -9,7 +9,9 @@ import { App, TFile } from "obsidian";
 import { ChunkManager, getSharedChunkManager } from "./chunks";
 import { SearchCore } from "./SearchCore";
 import { ExpandedQuery } from "./QueryExpander";
-let getChatModelManagerSingleton: (() => { getChatModel: () => BaseChatModel }) | null = null;
+let getChatModelManagerSingleton:
+  | (() => { getChatModel: (thinking?: boolean) => BaseChatModel })
+  | null = null;
 async function safeGetChatModel(): Promise<BaseChatModel | null> {
   try {
     if (!getChatModelManagerSingleton) {
@@ -17,7 +19,7 @@ async function safeGetChatModel(): Promise<BaseChatModel | null> {
       getChatModelManagerSingleton = () => mod.default.getInstance();
     }
     const chatModelManager = getChatModelManagerSingleton();
-    return chatModelManager.getChatModel();
+    return chatModelManager.getChatModel(false);
   } catch {
     return null;
   }
