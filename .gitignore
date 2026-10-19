@@ -12,6 +12,7 @@ node_modules
 # Compiled plugin output (build artifacts, not source)
 main.js
 styles.css
+copilot-local-only.zip
 
 # Exclude sourcemaps
 *.map
