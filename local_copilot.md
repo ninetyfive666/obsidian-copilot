@@ -85,3 +85,21 @@ ollama serve
 ```
 
 #### Now, go crazy with local models in chat and agent mode!
+
+## Semantic search (local embeddings)
+
+Besides the built-in lexical search, Copilot can index your whole vault with a **local embedding model** and combine meaning-based results with the lexical ones. Everything runs against your local server — no cloud, no extra app.
+
+**Setup:**
+
+1. Pull an embedding model, e.g. with Ollama: `ollama pull nomic-embed-text` (alternatives: `mxbai-embed-large`, or any embedding model your server offers).
+2. In Copilot settings, open the **Models** tab and add the embedding model to your provider. Models that look like embedding models are recognized automatically and offered in the embedding picker.
+3. In **Basic** settings, turn on **Semantic search (local embeddings)** and pick your embedding model under **Embedding model**.
+
+**How it behaves:**
+
+- The index is stored in your vault's config folder and **persists across restarts** — only new or changed notes are embedded, so startup stays fast.
+- Note edits, renames, and deletions are picked up automatically (debounced).
+- If you switch the embedding model, the old index is discarded and rebuilt once automatically (vectors from different models are not comparable).
+- While the index is still being built — or if the embedding server is unreachable — search transparently falls back to lexical results.
+- Excluded folders (your search inclusions/exclusions) are respected by the index.

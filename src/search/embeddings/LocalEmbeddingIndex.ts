@@ -2,6 +2,12 @@ import { App, TFile } from "obsidian";
 import { logInfo, logWarn } from "@/logger";
 import { getMatchingPatterns, shouldIndexFile } from "@/search/searchUtils";
 import { getSharedChunkManager } from "@/search/v3/chunks";
+import {
+  FORMAT_VERSION,
+  type EmbeddingIndexStorageApi,
+  type StoredManifest,
+  type StoredNoteEntry,
+} from "./EmbeddingIndexStorage";
 import { LocalEmbeddingClient } from "./LocalEmbeddingClient";
 
 export type LocalEmbeddingIndexStatus = "idle" | "building" | "ready" | "error";
@@ -17,10 +23,7 @@ export interface EmbeddingSearchHit {
   score: number;
 }
 
-interface IndexedNote {
-  mtime: number;
-  chunkIds: string[];
-}
+type IndexedNote = StoredNoteEntry;
 
 interface IndexedChunk {
   notePath: string;
@@ -35,13 +38,15 @@ export class LocalEmbeddingIndex {
   private dimension = 0;
   private status: LocalEmbeddingIndexStatus = "idle";
   private progress: EmbeddingIndexProgress = { total: 0, done: 0 };
-  private buildPromise: Promise<void> | null = null;
+  private syncPromise: Promise<void> | null = null;
   private terminalWaiters: Array<() => void> = [];
   private disposed = false;
 
   constructor(
     private app: App,
-    private client: LocalEmbeddingClient
+    private client: LocalEmbeddingClient,
+    private storage: EmbeddingIndexStorageApi,
+    private modelSignature: string
   ) {}
 
   getStatus(): LocalEmbeddingIndexStatus {
@@ -56,31 +61,33 @@ export class LocalEmbeddingIndex {
     return this.chunks.size;
   }
 
-  async buildAll(): Promise<void> {
-    if (this.buildPromise) return this.buildPromise;
-    this.buildPromise = this.runBuild().finally(() => {
-      this.buildPromise = null;
+  async sync(): Promise<void> {
+    if (this.syncPromise) return this.syncPromise;
+    this.syncPromise = this.runSync().finally(() => {
+      this.syncPromise = null;
     });
-    return this.buildPromise;
+    return this.syncPromise;
   }
 
   async refreshNote(file: TFile): Promise<void> {
-    if (this.disposed) return;
+    if (this.disposed || this.status !== "ready") return;
     const current = this.app.vault.getAbstractFileByPath(file.path);
     if (!current || !(current instanceof TFile)) {
-      this.removeNote(file.path);
+      await this.removeNote(file.path);
       return;
     }
     await this.indexNote(current);
+    await this.persistManifest();
   }
 
-  removeNote(notePath: string): void {
+  async removeNote(notePath: string): Promise<void> {
     const entry = this.notes.get(notePath);
     if (!entry) return;
     for (const chunkId of entry.chunkIds) {
       this.chunks.delete(chunkId);
     }
     this.notes.delete(notePath);
+    await this.storage.removeNoteFile(entry.file);
   }
 
   search(queryVector: Float32Array, k: number): EmbeddingSearchHit[] {
@@ -111,7 +118,7 @@ export class LocalEmbeddingIndex {
     if (this.status === "ready") return true;
     if (this.status === "error") return false;
     if (this.status === "idle") {
-      void this.buildAll();
+      void this.sync();
     }
     return await new Promise<boolean>((resolve) => {
       let settled = false;
@@ -143,11 +150,14 @@ export class LocalEmbeddingIndex {
     }
   }
 
-  private async runBuild(): Promise<void> {
+  private async runSync(): Promise<void> {
+    await this.restoreFromStorage();
+
     const { inclusions, exclusions } = getMatchingPatterns();
     const files = this.app.vault
       .getMarkdownFiles()
       .filter((file) => shouldIndexFile(this.app, file, inclusions, exclusions));
+    const currentPaths = new Set(files.map((file) => file.path));
 
     this.status = "building";
     this.progress = { total: files.length, done: 0 };
@@ -155,11 +165,13 @@ export class LocalEmbeddingIndex {
     let failures = 0;
     for (const file of files) {
       if (this.disposed) return;
-      try {
-        await this.indexNote(file);
-      } catch (error) {
-        failures += 1;
-        logWarn(`LocalEmbeddingIndex: failed to index ${file.path}`, error);
+      if (!this.isUpToDate(file)) {
+        try {
+          await this.indexNote(file);
+        } catch (error) {
+          failures += 1;
+          logWarn(`LocalEmbeddingIndex: failed to index ${file.path}`, error);
+        }
       }
       this.progress.done += 1;
       if (this.progress.done % YIELD_EVERY_NOTES === 0) {
@@ -167,15 +179,53 @@ export class LocalEmbeddingIndex {
       }
     }
 
+    for (const notePath of Array.from(this.notes.keys())) {
+      if (currentPaths.has(notePath)) continue;
+      await this.removeNote(notePath);
+    }
+
     if (this.disposed) return;
+    await this.persistManifest();
     const indexed = this.chunks.size > 0 || files.length === 0;
     this.status = indexed ? "ready" : "error";
-    if (failures > 0) {
+    if (failures > 0 || this.notes.size > 0) {
       logInfo(
-        `LocalEmbeddingIndex: build finished with ${failures} failed notes (${this.chunks.size} chunks indexed)`
+        `LocalEmbeddingIndex: sync finished (${this.notes.size} notes, ${this.chunks.size} chunks, ${failures} failures)`
       );
     }
     this.notifyTerminal();
+  }
+
+  private async restoreFromStorage(): Promise<void> {
+    const manifest = await this.storage.load();
+    if (!manifest) return;
+    if (manifest.modelSignature !== this.modelSignature) {
+      logInfo("LocalEmbeddingIndex: embedding model changed, rebuilding the persisted index.");
+      await this.storage.clearAll();
+      return;
+    }
+    this.dimension = manifest.dimension;
+    for (const [notePath, entry] of Object.entries(manifest.notes)) {
+      const vectors = await this.storage.readNote(notePath, entry, manifest.dimension);
+      if (!vectors) continue;
+      vectors.forEach((vector, chunkId) => {
+        this.chunks.set(chunkId, { notePath, vector });
+      });
+      this.notes.set(notePath, entry);
+    }
+    if (this.notes.size > 0) {
+      logInfo(
+        `LocalEmbeddingIndex: restored ${this.notes.size} notes (${this.chunks.size} chunks) from the persisted index.`
+      );
+    }
+  }
+
+  private isUpToDate(file: TFile): boolean {
+    const entry = this.notes.get(file.path);
+    if (!entry || entry.mtime !== file.stat.mtime || entry.chunkIds.length === 0) {
+      return false;
+    }
+    return entry.chunkIds.every((chunkId) => this.chunks.has(chunkId));
   }
 
   private async indexNote(file: TFile): Promise<void> {
@@ -183,7 +233,7 @@ export class LocalEmbeddingIndex {
     const chunkManager = getSharedChunkManager(this.app);
     const chunks = await chunkManager.getChunks([file.path]);
 
-    this.removeNote(file.path);
+    this.forgetNote(file.path);
     if (!content || chunks.length === 0) return;
 
     const vectors = await this.client.embed(chunks.map((chunk) => chunk.content));
@@ -202,10 +252,38 @@ export class LocalEmbeddingIndex {
         vector: vectors[i],
       });
     }
-    this.notes.set(file.path, {
-      mtime: file.stat.mtime,
-      chunkIds: chunks.map((chunk) => chunk.id),
-    });
+    const entry = await this.storage.writeNote(
+      file.path,
+      file.stat.mtime,
+      chunks.map((chunk, i) => ({ id: chunk.id, vector: vectors[i] }))
+    );
+    this.notes.set(file.path, entry);
+  }
+
+  private forgetNote(notePath: string): void {
+    const entry = this.notes.get(notePath);
+    if (entry) {
+      for (const chunkId of entry.chunkIds) {
+        this.chunks.delete(chunkId);
+      }
+      this.notes.delete(notePath);
+    }
+    for (const chunkId of Array.from(this.chunks.keys())) {
+      if (chunkId.startsWith(`${notePath}#`)) {
+        this.chunks.delete(chunkId);
+      }
+    }
+  }
+
+  private async persistManifest(): Promise<void> {
+    const manifest: StoredManifest = {
+      format: FORMAT_VERSION,
+      modelSignature: this.modelSignature,
+      dimension: this.dimension,
+      savedAt: Date.now(),
+      notes: Object.fromEntries(this.notes),
+    };
+    await this.storage.saveManifest(manifest);
   }
 
   private norm(vector: Float32Array): number {

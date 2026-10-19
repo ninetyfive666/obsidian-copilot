@@ -30,7 +30,8 @@ Full step-by-step instructions (context windows, CORS, custom endpoints) live in
 - **Agent mode** — the model works with your vault through tools: local note search, reading and
   editing notes, saved memory. Runs entirely against your local server.
 - **Vault QA / relevant notes** — lexical search over your notes to ground answers in your own
-  documents (offline).
+  documents (offline), plus optional **semantic search** with a local embedding model (persistent,
+  incremental index, automatic rebuild when the model changes).
 - **Custom commands** — one-click prompts that transform or query your notes.
 - **Projects** — scoped system prompts, model choice, and context folders per project.
 - **Quick chat** — a fast floating answer box for the active note.

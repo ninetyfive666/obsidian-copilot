@@ -3,6 +3,7 @@ import { ChatModelProviders } from "@/constants";
 import { logInfo, logWarn } from "@/logger";
 import { configuredModelToCustomModel, type ModelManagementApi } from "@/modelManagement";
 import { getSettings, subscribeToSettingsChange } from "@/settings/model";
+import { EmbeddingIndexStorage } from "./EmbeddingIndexStorage";
 import { LocalEmbeddingClient, type EmbeddingConnection } from "./LocalEmbeddingClient";
 import { LocalEmbeddingIndex } from "./LocalEmbeddingIndex";
 
@@ -74,10 +75,11 @@ async function syncNow(
 
   stopService();
   const client = new LocalEmbeddingClient(connection);
-  const index = new LocalEmbeddingIndex(app, client);
+  const storage = new EmbeddingIndexStorage(app);
+  const index = new LocalEmbeddingIndex(app, client, storage, signature);
   state = { index, client, signature };
   logInfo(`LocalEmbeddings: indexing started with model "${connection.model}"`);
-  void index.buildAll();
+  void index.sync();
 }
 
 function stopService(): void {
@@ -121,11 +123,11 @@ function subscribeToVaultEvents(app: App): void {
     if (file instanceof TFile) scheduleRefresh(app, file.path);
   });
   app.vault.on("delete", (file) => {
-    if (file instanceof TFile) state?.index.removeNote(file.path);
+    if (file instanceof TFile) void state?.index.removeNote(file.path);
   });
   app.vault.on("rename", (file, oldPath) => {
     if (file instanceof TFile) {
-      state?.index.removeNote(oldPath);
+      void state?.index.removeNote(oldPath);
       scheduleRefresh(app, file.path);
     }
   });
@@ -155,7 +157,7 @@ async function flushRefreshes(app: App, notePaths: string[]): Promise<void> {
         logWarn(`LocalEmbeddings: failed to refresh ${notePath}`, error);
       }
     } else {
-      state.index.removeNote(notePath);
+      await state.index.removeNote(notePath);
     }
   }
 }

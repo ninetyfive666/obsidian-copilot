@@ -284,7 +284,7 @@ export const BasicSettings: React.FC = () => {
         <SettingItem
           type="switch"
           title="Semantic search (local embeddings)"
-          description="Indexes your vault with a local embedding model and combines vector results with the lexical search."
+          description="Indexes your vault with a local embedding model and combines vector results with the lexical search. The index persists across restarts and only new or changed notes are embedded."
           checked={settings.useLocalEmbeddings}
           onCheckedChange={(checked) => updateSetting("useLocalEmbeddings", checked)}
         />
