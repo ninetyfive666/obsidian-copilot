@@ -118,7 +118,6 @@ export interface ChatInputProps {
     urls?: string[];
     folders?: string[];
   };
-
 }
 
 export interface ChatInputHandle {

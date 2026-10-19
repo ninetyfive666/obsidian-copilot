@@ -65,9 +65,7 @@ const CATEGORY_OPTIONS: CategoryOption[] = [
   },
 ];
 
-export function shouldShowAtMentionTools(args: {
-  isCopilotPlus: boolean;
-}): boolean {
+export function shouldShowAtMentionTools(args: { isCopilotPlus: boolean }): boolean {
   return args.isCopilotPlus;
 }
 

@@ -1,7 +1,5 @@
-import modelEnableStories, { ShortCatalog } from "@/components/ui/ModelEnableList.stories";
-import type { Meta } from "@/lib/story";
 import { ModelEnableList, type ModelEnableGroup } from "@/components/ui/ModelEnableList";
-import { createEvent, fireEvent, render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import React from "react";
 
 const GROUPS: ModelEnableGroup[] = [

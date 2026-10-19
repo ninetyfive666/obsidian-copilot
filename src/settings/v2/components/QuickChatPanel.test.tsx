@@ -4,12 +4,10 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import React from "react";
 
 jest.mock("@/settings/model", () => ({
-  // eslint-disable-next-line @eslint-react/hooks-extra/no-unnecessary-use-prefix -- mocks the public hook
   useSettingsValue: () => ({ defaultModelKey: "legacy-default" }),
   updateSetting: jest.fn(),
 }));
 jest.mock("@/hooks/useChatBackendModelOptions", () => ({
-  // eslint-disable-next-line @eslint-react/hooks-extra/no-unnecessary-use-prefix -- mocks the public hook
   useChatBackendModelOptions: () => ({
     options: [
       { label: "Model A", value: "a" },

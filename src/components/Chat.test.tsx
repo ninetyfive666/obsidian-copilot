@@ -16,7 +16,6 @@ const mockSelection: NoteSelectedTextContext = {
 const mockSelections = [mockSelection];
 const mockMessages = [{ id: "message-1", message: "Original question", sender: USER_SENDER }];
 
-/* eslint-disable @eslint-react/hooks-extra/no-unnecessary-use-prefix */
 jest.mock("@/aiParams", () => ({
   useModelKey: () => ["model", jest.fn()],
   useChainType: () => ["llm_chain"],
@@ -41,10 +40,9 @@ jest.mock("@/context/ChatInputContext", () => ({
   ChatInputProvider: ({ children }: { children: React.ReactNode }) => children,
   useChatInput: () => ({}),
 }));
-/* eslint-enable @eslint-react/hooks-extra/no-unnecessary-use-prefix */
 jest.mock("@/components/chat-components/ChatControls", () => ({
   ChatControls: ({ onCopyChatLink }: { onCopyChatLink?: () => void }) => (
-    <button disabled={!onCopyChatLink} onClick={onCopyChatLink}>
+    <button type="button" disabled={!onCopyChatLink} onClick={onCopyChatLink}>
       Copy chat link
     </button>
   ),

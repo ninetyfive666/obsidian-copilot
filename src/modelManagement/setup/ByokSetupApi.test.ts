@@ -42,10 +42,7 @@ describe("ByokSetupApi", () => {
         displayName: "My Ollama",
         baseUrl: "http://localhost:11434/v1",
         apiKey: "key-123",
-        models: [
-          OLLAMA_CATALOG.models["llama3.1:8b"],
-          OLLAMA_CATALOG.models["qwen2.5:7b"],
-        ],
+        models: [OLLAMA_CATALOG.models["llama3.1:8b"], OLLAMA_CATALOG.models["qwen2.5:7b"]],
       });
 
       const provider = providers.get(result.providerId)!;

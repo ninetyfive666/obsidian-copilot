@@ -36,7 +36,7 @@ import { parseReasoningBlock } from "@/LLMProviders/chainRunner/utils/AgentReaso
 import { processInlineCitations } from "@/LLMProviders/chainRunner/utils/citationUtils";
 import { logError } from "@/logger";
 import { ChatMessage } from "@/types/message";
-import { extractYoutubeVideoId, insertAtCursor } from "@/utils";
+import { insertAtCursor } from "@/utils";
 import { preprocessAIResponse } from "@/utils/markdownPreprocess";
 import { renderMarkdown } from "@/utils/renderMarkdown";
 import { App, Component, TFile } from "obsidian";
@@ -465,30 +465,10 @@ const ChatSingleMessage: React.FC<ChatSingleMessageProps> = ({
         settings.enableInlineCitations
       );
 
-      const citationPlaceholderProcessed = sourcesSectionProcessed.replace(
+      return sourcesSectionProcessed.replace(
         /\[\^(\d+)\](?!:)/g,
         '<span class="copilot-citation-ref">[$1]</span>'
       );
-
-      const processYouTubeEmbed = (content: string): string => {
-        if (!isStreaming) {
-          return content;
-        }
-
-        const imageEmbedRegex = /!\[([^\]]*)\]\(([^)]+)\)/g;
-
-        return content.replace(imageEmbedRegex, (match, title: string, url: string) => {
-          const videoId = extractYoutubeVideoId(url);
-          if (!videoId) {
-            return match;
-          }
-          const displayTitle = title || "YouTube Video";
-          const thumbnail = `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`;
-          return `[![${displayTitle}](${thumbnail})](${url})`;
-        });
-      };
-
-      return processYouTubeEmbed(citationPlaceholderProcessed);
     },
     [app, isStreaming, settings.enableInlineCitations, collapsibleOpenStateMap]
   );

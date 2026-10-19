@@ -1,5 +1,4 @@
-import type { ConfiguredModel, Provider } from "@/modelManagement/types/persisted";
-import type { ModelInfo } from "@/modelManagement/types/catalog";
+import type { ConfiguredModel, ModelInfo, Provider } from "@/modelManagement";
 import {
   buildModelEnableGroups,
   partitionChatCandidates,

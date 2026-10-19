@@ -56,7 +56,7 @@ import {
   setSettings,
   subscribeToSettingsChange,
 } from "@/settings/model";
-import { ensureCopilotSubfolders, getEffectiveConversationsFolder } from "@/settings/copilotFolder";
+import { getEffectiveConversationsFolder } from "@/settings/copilotFolder";
 import { isDesktopRuntime } from "@/utils/desktopRuntime";
 import { disposeNotificationSound } from "@/utils/notificationSound";
 import { installRendererEventsShim } from "@/utils/rendererEventsShim";
@@ -73,10 +73,8 @@ import {
   SelectionHighlight,
 } from "@/editor";
 import {
-  addIcon,
   Editor,
   editorInfoField,
-  FileSystemAdapter,
   MarkdownFileInfo,
   MarkdownView,
   Menu,
@@ -97,7 +95,6 @@ import { RecentUsageManager } from "@/utils/recentUsageManager";
 import {
   listMarkdownFiles,
   patchFrontmatter,
-  readFrontmatterViaAdapter,
   resolveFileByPath,
   trashFile,
 } from "@/utils/vaultAdapterUtils";
@@ -197,10 +194,8 @@ export default class CopilotPlugin extends Plugin {
 
     this.initActiveLeafChangeHandler();
 
-    this.ribbonIconEl = this.addRibbonIcon(
-      "message-square",
-      "Open Copilot Chat",
-      () => this.activateView()
+    this.ribbonIconEl = this.addRibbonIcon("message-square", "Open Copilot Chat", () =>
+      this.activateView()
     );
 
     registerCommands(this);
@@ -214,7 +209,6 @@ export default class CopilotPlugin extends Plugin {
     this.registerEvent(
       this.app.workspace.on("active-leaf-change", (leaf) => {
         this.chatSelectionHighlightController.handleActiveLeafChange(leaf ?? null);
-
       })
     );
 
@@ -242,9 +236,7 @@ export default class CopilotPlugin extends Plugin {
     const results = await Promise.allSettled([
       this.projectRegister.initialize(),
       this.customCommandRegister.initialize().then(() => migrateCommands(this.app)),
-      this.systemPromptRegister
-        .initialize()
-        .then(() => migrateSystemPromptsFromSettings(this.app)),
+      this.systemPromptRegister.initialize().then(() => migrateSystemPromptsFromSettings(this.app)),
     ]);
     for (const result of results) {
       if (result.status === "rejected") {

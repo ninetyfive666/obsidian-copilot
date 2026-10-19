@@ -67,7 +67,6 @@ import { recordPromptPayload } from "./utils/promptPayloadRecorder";
 import { unescapeXml } from "./utils/xmlParsing";
 import { StructuredTool } from "@langchain/core/tools";
 import { AIMessage, AIMessageChunk } from "@langchain/core/messages";
-import ChainOwner from "@/LLMProviders/chainOwner";
 
 type ToolCallWithExecutor = {
   tool: StructuredTool;
@@ -627,7 +626,6 @@ Include your extracted terms as: [SALIENT_TERMS: term1, term2, term3]`;
 
     const thinkStreamer = new ThinkBlockStreamer(updateCurrentAiMessage, excludeThinking);
     let sources: { title: string; path: string; score: number; explanation?: unknown }[] = [];
-
 
     try {
       logInfo("==== Step 1: Planning tools ====");

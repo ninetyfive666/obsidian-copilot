@@ -18,7 +18,7 @@ import {
 } from "@/modelManagement/ui/components/ByokGlobalTable";
 import { AddProviderModal } from "@/modelManagement/ui/dialogs/AddProviderDialog";
 import { ConfigureProviderModal } from "@/modelManagement/ui/dialogs/ConfigureProviderDialog";
-import { settingsStore, useSettingsValue } from "@/settings/model";
+import { settingsStore } from "@/settings/model";
 import { useAtomValue } from "jotai";
 import { Plus } from "lucide-react";
 import { Notice } from "obsidian";

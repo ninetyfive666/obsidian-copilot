@@ -63,7 +63,7 @@ jest.mock("@/services/webViewerService/webViewerServiceSelection", () => ({
     start = mockStartSelectionTracker;
   },
 }));
-import { logError, logInfo, logWarn } from "@/logger";
+import { logError, logInfo } from "@/logger";
 import { logFileManager } from "@/logFileManager";
 import { flushPersistence } from "@/services/settingsPersistence";
 import { isDesktopRuntime } from "@/utils/desktopRuntime";

@@ -143,7 +143,7 @@ export const RelevantNotes = memo(
     const activeFile = useActiveFile();
     const settings = useSettingsValue();
     const liveUpdateEnabled = settings.relevantNotesLiveUpdate;
-    const { result, refresh, liveRefresh } = useRelevantNotes(false, liveUpdateEnabled);
+    const { result, liveRefresh } = useRelevantNotes(false, liveUpdateEnabled);
     const activeFileName = activeFile?.extension === "md" ? activeFile.basename : undefined;
     const activeFilePath = activeFile?.extension === "md" ? activeFile.path : undefined;
     const animated = !useReducedMotion();

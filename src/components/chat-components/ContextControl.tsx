@@ -18,7 +18,6 @@ interface ChatControlsProps {
 
   onAddToContext: (category: string, data: TFile | string | TFolder | WebTabContext | null) => void;
   onRemoveFromContext: (category: string, data: string) => void;
-
 }
 
 export const ContextControl: React.FC<ChatControlsProps> = ({

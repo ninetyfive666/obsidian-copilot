@@ -17,7 +17,7 @@ Here's an example for Apple Metal macs. I can run 7B models blazingly fast on my
 
 <img src="./images/lm-studio.png" alt="LM Studio">
 
-In Copilot settings, select Add Custom Model, paste the model name from LM Studio, select `lm-studio` as provider, click add, and you'll find it in your model picker!
+In Copilot settings, open the **Models** tab, click **Add a provider**, pick **LM Studio**, and enter the model id from LM Studio — the connection is verified right away and the model shows up in your model picker.
 
 <img src="./images/lm-studio-model-pick.png" alt="LM Studio Model">
 
@@ -59,7 +59,7 @@ Again, `OLLAMA_ORIGINS=app://obsidian.md*` is required!
 <details>
 <summary>macOS App</summary>
 
-If Ollama is run as a macOS application, [environment variables should be set using launchctl](https://github.com/Ollama/Ollama/blob/main/docs/faq.md#setting-environment-variables-on-mac). To support Obsidian, set "app://obsidian.md*" on the `OLLAMA_ORIGINS` variable by running this command:
+If Ollama is run as a macOS application, [environment variables should be set using launchctl](https://github.com/Ollama/Ollama/blob/main/docs/faq.md#setting-environment-variables-on-mac). To support Obsidian, set "app://obsidian.md\*" on the `OLLAMA_ORIGINS` variable by running this command:
 
 ```sh
 launchctl setenv OLLAMA_ORIGINS "app://obsidian.md*"
@@ -71,7 +71,7 @@ Then, quit Ollama from the menu bar and reopen it.
 
 <img src="./images/ollama-serve.png" alt="Ollama">
 
-Inside Copilot settings, click Add Custom Model, enter the model name you pulled from Ollama, e.g. `mistral`, select `ollama` as provider, click add, and you'll find it in your model picker!
+Inside Copilot settings, open the **Models** tab, click **Add a provider**, pick **Ollama**, and enter the model name you pulled from Ollama, e.g. `mistral` — the connection is verified right away and the model shows up in your model picker.
 
 <img src="./images/ollama-setting.png" alt="Ollama">
 
@@ -89,24 +89,9 @@ If you want to use CMD, type the following commands
 
 ```
 ollama pull mistral
-ollama pull nomic-embed-text
 # Remember to close the Ollama app first to free up the port
 set OLLAMA_ORIGINS=app://obsidian.md*
 ollama serve
 ```
 
-## Ollama for Local Embeddings
-
-Ollama has added support for local embeddings for RAG since v0.1.26! It's super easy to setup, just run
-
-```
-ollama pull nomic-embed-text
-```
-
-and start your local Ollama server as before. Now you can add your Ollama embedding model in Copilot QA settings as `nomic-embed-text` with provider `ollama`, and it will use your local embeddings!
-
-With this one Ollama server running, you can set your Chat model as Ollama too, meaning it handles both chat streaming and embedding! You can then have a **completely offline QA** experience!
-
-Check Ollama for more embedding models, e.g. `mxbai-embed-large` is a better model than `nomic-embed-text` for vector search.
-
-#### Now, go crazy with local models in Chat mode and QA modes!
+#### Now, go crazy with local models in chat and agent mode!

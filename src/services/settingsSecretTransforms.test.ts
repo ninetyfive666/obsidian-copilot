@@ -122,7 +122,7 @@ describe("settingsSecretTransforms", () => {
             },
           ],
         },
-      } as unknown as Partial<CopilotSettings>);
+      });
 
       const result = cleanupLegacyFields(settings) as unknown as Record<string, unknown>;
 
@@ -143,9 +143,11 @@ describe("settingsSecretTransforms", () => {
       expect((result.agentMode as Record<string, unknown>).mcpServers).toBeUndefined();
       expect(settings as unknown as Record<string, unknown>).toHaveProperty("_keychainOnly", true);
       expect(
-        ((settings as unknown as Record<string, unknown>).agentMode as {
-          mcpServers: unknown[];
-        }).mcpServers
+        (
+          (settings as unknown as Record<string, unknown>).agentMode as {
+            mcpServers: unknown[];
+          }
+        ).mcpServers
       ).toHaveLength(1);
     });
   });

@@ -4,7 +4,7 @@ import { KeychainService } from "@/services/keychainService";
 import { type LegacyBackupResult } from "@/services/legacyCredentialBackup";
 import { cleanupLegacyFields, stripKeychainFields } from "@/services/settingsSecretTransforms";
 import { type CopilotSettings, sanitizeSettings } from "@/settings/model";
-import { type App, Notice } from "obsidian";
+import { Notice } from "obsidian";
 
 let writeQueue: Promise<void> = Promise.resolve();
 let lastPersistedSettings: CopilotSettings | undefined;

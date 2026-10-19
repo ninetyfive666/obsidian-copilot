@@ -65,7 +65,9 @@ function composer(inputMessage: string, selectedImages: File[]) {
     selectedImages,
     handleSendMessage: jest.fn(),
     isGenerating: false,
-    app: { workspace: { getActiveFile: () => null, on: jest.fn(), off: jest.fn(), offref: jest.fn() } },
+    app: {
+      workspace: { getActiveFile: () => null, on: jest.fn(), off: jest.fn(), offref: jest.fn() },
+    },
     contextNotes: [],
     setContextNotes: jest.fn(),
     setInputMessage: jest.fn(),

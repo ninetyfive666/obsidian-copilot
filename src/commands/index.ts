@@ -22,7 +22,7 @@ import { getAllQAMarkdownContent } from "@/search/searchUtils";
 import { NoteSelectedTextContext, WebSelectedTextContext } from "@/types/message";
 import { isSourceModeOn } from "@/utils";
 import { isDesktopRuntime } from "@/utils/desktopRuntime";
-import { Editor, MarkdownView, Notice, TFile } from "obsidian";
+import { Editor, MarkdownView, Notice } from "obsidian";
 import { v4 as uuidv4 } from "uuid";
 import { COMMAND_IDS, COMMAND_ICONS, COMMAND_NAMES, CommandId } from "@/constants";
 import { setSelectedTextContexts } from "@/aiParams";
@@ -172,7 +172,7 @@ export function registerCommands(plugin: CopilotPlugin) {
 
   addCommand(plugin, COMMAND_IDS.CLEAR_COPILOT_CACHE, async () => {
     try {
-      await plugin.fileParserManager.clearPDFCache(plugin.app.vault);
+      plugin.fileParserManager.clearPDFCache(plugin.app.vault);
 
       const fileCache = FileCache.getInstance<string>();
       await fileCache.clear(plugin.app.vault);

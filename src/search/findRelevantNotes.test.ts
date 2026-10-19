@@ -27,8 +27,7 @@ function createMarkdownFile(path: string): TFile {
 function createVault(files: TFile[]): App {
   return {
     vault: {
-      getAbstractFileByPath: (path: string) =>
-        files.find((file) => file.path === path) ?? null,
+      getAbstractFileByPath: (path: string) => files.find((file) => file.path === path) ?? null,
     },
   } as unknown as App;
 }
@@ -139,9 +138,7 @@ describe("findRelevantNotes", () => {
     });
 
     it("returns false when the status differs", () => {
-      expect(
-        isSameRelevantNotesResult(base, { status: "no-matches", notes: [] })
-      ).toBe(false);
+      expect(isSameRelevantNotesResult(base, { status: "no-matches", notes: [] })).toBe(false);
     });
 
     it("returns false when a note differs", () => {

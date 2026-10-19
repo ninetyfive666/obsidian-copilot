@@ -33,7 +33,7 @@ class CanvasParser implements FileParser {
       const canvasData = await canvasLoader.load(file);
 
       return canvasLoader.buildPrompt(canvasData);
-    } catch (error) {
+    } catch {
       return `[Error: Could not parse Canvas file ${file.basename}]`;
     }
   }

@@ -402,10 +402,6 @@ export function extractYoutubeVideoId(url: string): string | null {
   }
 }
 
-export function formatYoutubeUrl(videoId: string): string {
-  return `https://www.youtube.com/watch?v=${videoId}`;
-}
-
 export function isYoutubeUrl(url: string): boolean {
   return validateYoutubeUrl(url).isValid;
 }

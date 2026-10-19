@@ -14,14 +14,14 @@ LLM servers</strong>. No cloud, no API keys, no accounts, no telemetry.</p>
 
 Any OpenAI-compatible chat endpoint works:
 
-| Server | Default base URL |
-| --- | --- |
-| [llama.cpp](https://github.com/ggml-org/llama.cpp) (`llama-server`) | `http://localhost:8080/v1` |
-| [Ollama](https://ollama.ai/) | `http://localhost:11434/v1` |
-| [LM Studio](https://lmstudio.ai/) | `http://localhost:1234/v1` |
-| Anything else (vLLM, text-generation-webui, …) | your own base URL |
+| Server                                                              | Default base URL            |
+| ------------------------------------------------------------------- | --------------------------- |
+| [llama.cpp](https://github.com/ggml-org/llama.cpp) (`llama-server`) | `http://localhost:8080/v1`  |
+| [Ollama](https://ollama.ai/)                                        | `http://localhost:11434/v1` |
+| [LM Studio](https://lmstudio.ai/)                                   | `http://localhost:1234/v1`  |
+| Anything else (vLLM, text-generation-webui, …)                      | your own base URL           |
 
-Full step-by-step instructions (context windows, CORS, local embeddings) live in
+Full step-by-step instructions (context windows, CORS, custom endpoints) live in
 [`local_copilot.md`](./local_copilot.md).
 
 ## Features
@@ -30,8 +30,8 @@ Full step-by-step instructions (context windows, CORS, local embeddings) live in
   from your vault notes.
 - **Agent mode** — the model works with your vault through tools: local note search, reading and
   editing notes, saved memory. Runs entirely against your local server.
-- **Vault QA / relevant notes** — lexical semantic search over your notes to ground answers in
-  your own documents (offline).
+- **Vault QA / relevant notes** — lexical search over your notes to ground answers in your own
+  documents (offline).
 - **Custom commands** — one-click prompts that transform or query your notes.
 - **Projects** — scoped system prompts, model choice, and context folders per project.
 - **Quick chat** — a fast floating answer box for the active note.

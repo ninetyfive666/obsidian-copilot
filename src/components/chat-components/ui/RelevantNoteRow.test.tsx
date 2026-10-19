@@ -1,4 +1,3 @@
-/* eslint-disable @eslint-react/hooks-extra/no-unnecessary-use-prefix -- Mock exports must preserve production hook names. */
 import { RelevantNoteRow } from "@/components/chat-components/ui/RelevantNoteRow";
 import type { RelevantNoteEntry } from "@/search/findRelevantNotes";
 import { renderMarkdown } from "@/utils/renderMarkdown";

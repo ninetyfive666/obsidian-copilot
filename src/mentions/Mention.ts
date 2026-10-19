@@ -31,7 +31,9 @@ export class Mention {
     return Mention.instance;
   }
 
-  async processUrl(url: string): Promise<{ response: string; elapsed_time_ms: number; error?: string }> {
+  async processUrl(
+    url: string
+  ): Promise<{ response: string; elapsed_time_ms: number; error?: string }> {
     return { response: url, elapsed_time_ms: 0, error: UNSUPPORTED_URL_ERROR };
   }
 

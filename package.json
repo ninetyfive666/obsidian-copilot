@@ -90,13 +90,13 @@
     "ts-jest": "^29.1.0",
     "tslib": "2.4.0",
     "typescript": "^5.7.2",
+    "web-streams-polyfill": "^3.3.2",
     "yaml": "^2.6.1"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
     "@dnd-kit/sortable": "^10.0.0",
     "@dnd-kit/utilities": "^3.2.2",
-    "@langchain/anthropic": "^1.5.4",
     "@langchain/classic": "^1.0.41",
     "@langchain/core": "^1.2.5",
     "@langchain/openai": "^1.5.6",

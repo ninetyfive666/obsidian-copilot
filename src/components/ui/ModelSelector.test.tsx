@@ -55,7 +55,9 @@ describe("ModelSelector", () => {
         displayName: "Llama 3.1 8B",
         _subtitle: "A solid local general-purpose model.",
       });
-      render(<ModelSelector value="llama3.1:8b|ollama" onChange={jest.fn()} models={[described]} />);
+      render(
+        <ModelSelector value="llama3.1:8b|ollama" onChange={jest.fn()} models={[described]} />
+      );
 
       expect(screen.queryByText("A solid local general-purpose model.")).toBeNull();
 

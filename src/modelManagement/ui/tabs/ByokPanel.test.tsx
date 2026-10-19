@@ -1,9 +1,6 @@
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import React from "react";
 
-const mockEnsureLoaded = jest.fn().mockResolvedValue(undefined);
-const mockGetAllProviders = jest.fn().mockReturnValue([]);
-const mockOnChange = jest.fn().mockReturnValue(() => {});
 const mockRemoveProvider = jest.fn().mockResolvedValue(undefined);
 const mockAddProviderOpen = jest.fn();
 const mockConfigureOpen = jest.fn();
@@ -18,12 +15,6 @@ const mockSubscribe = jest.fn((listener: () => void) => {
 
 jest.mock("@/modelManagement/ui/ModelManagementContext", () => {
   const api = {
-    catalogService: {
-      ensureLoaded: mockEnsureLoaded,
-      getAllProviders: mockGetAllProviders,
-      onChange: mockOnChange,
-      refresh: jest.fn(),
-    },
     coordinator: { removeProvider: mockRemoveProvider },
     providerRegistry: {
       verify: mockVerify,
@@ -31,10 +22,10 @@ jest.mock("@/modelManagement/ui/ModelManagementContext", () => {
       subscribe: mockSubscribe,
     },
   };
-  // eslint-disable-next-line @eslint-react/hooks-extra/no-unnecessary-use-prefix -- mocks the real hook
+
   return { useModelManagement: () => api };
 });
-// eslint-disable-next-line @eslint-react/hooks-extra/no-unnecessary-use-prefix -- mocks the real `useApp` hook; the name must match the export
+
 jest.mock("@/context", () => ({ useApp: () => ({}) }));
 jest.mock("@/modelManagement/state/atoms", () => {
   const jotai = jest.requireActual<typeof import("jotai")>("jotai");
@@ -72,7 +63,7 @@ jest.mock("@/settings/model", () => {
   const jotai = jest.requireActual<typeof import("jotai")>("jotai");
   return {
     settingsStore: jotai.createStore(),
-    // eslint-disable-next-line @eslint-react/hooks-extra/no-unnecessary-use-prefix -- mocks the real hook; name must match the export
+
     useSettingsValue: () => ({ enableSelfHostMode: false }),
   };
 });
@@ -103,7 +94,6 @@ describe("ByokPanel", () => {
     jest.clearAllMocks();
     mockListByOrigin.mockReturnValue([{ providerId: "p1" }, { providerId: "p2" }]);
     mockVerify.mockReset().mockResolvedValue({ ok: true, checkedAt: 0 });
-    mockEnsureLoaded.mockResolvedValue(undefined);
   });
   describe("ByokPanel()", () => {
     it("renders configured providers and their models after the catalog loads", async () => {
@@ -221,15 +211,13 @@ describe("ByokPanel", () => {
       expect(mockVerify).toHaveBeenCalledTimes(4);
     });
 
-    it("finishes without a progress banner when there are no providers (https://github.com/logancyang/obsidian-copilot/issues/3147)", async () => {
+    it("finishes without a progress banner when there are no providers (https://github.com/logancyang/obsidian-copilot/issues/3147)", () => {
       mockListByOrigin.mockReturnValue([]);
       render(<ByokPanel />);
-      await waitFor(() => expect(mockEnsureLoaded).toHaveBeenCalled());
       expect(mockVerify).not.toHaveBeenCalled();
       expect(screen.queryByRole("status")).toBeNull();
     });
-    it("shows current provider health while the catalog is still loading (https://github.com/logancyang/obsidian-copilot/issues/3147)", async () => {
-      mockEnsureLoaded.mockReturnValue(new Promise(() => {}));
+    it("shows current provider health for configured providers (https://github.com/logancyang/obsidian-copilot/issues/3147)", async () => {
       render(<ByokPanel />);
       expect(screen.getByText("Anthropic")).toBeTruthy();
       await screen.findAllByText("Verified");

@@ -30,4 +30,3 @@ export interface ConfiguredModel {
 export interface BackendConfig {
   enabledModels: string[];
 }
-

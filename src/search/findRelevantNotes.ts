@@ -5,8 +5,6 @@ const MAX_RESULTS = 20;
 
 export type RelevantNotesSearchStatus = "no-usable-context" | "matches" | "no-matches";
 
-
-
 function getNoteLinks(app: App, file: TFile) {
   const resultMap = new Map<string, { links: boolean; backlinks: boolean }>();
   const linkedNotes = getLinkedNotes(app, file);
@@ -34,7 +32,6 @@ function localNoteScoreByPath(app: App, filePath: string, file: TFile): Map<stri
     if (path === filePath) continue;
     const note = app.vault.getAbstractFileByPath(path);
     if (!(note instanceof TFile) || note.extension !== "md") continue;
-    // Direct outgoing links are the strongest local signal, backlinks the second.
     scoreByPath.set(path, links && backlinks ? 1 : links ? 0.8 : 0.5);
   }
   return scoreByPath;
@@ -100,7 +97,7 @@ export async function findRelevantNotes({
     .slice(0, MAX_RESULTS)
     .map(([path, score]) => {
       const related = app.vault.getAbstractFileByPath(path);
-      const title = related instanceof TFile ? related.basename : path.split("/").pop() ?? path;
+      const title = related instanceof TFile ? related.basename : (path.split("/").pop() ?? path);
       return {
         note: { path, title },
         metadata: {

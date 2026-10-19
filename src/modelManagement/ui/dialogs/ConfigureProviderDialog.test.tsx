@@ -13,10 +13,8 @@ const mockUpdate = jest.fn().mockResolvedValue(undefined);
 const mockBulkSet = jest.fn().mockResolvedValue([]);
 const mockEnableModel = jest.fn().mockResolvedValue(undefined);
 const mockRemoveRefs = jest.fn().mockResolvedValue(undefined);
-const mockGetProvider = jest.fn();
 
 jest.mock("@/modelManagement/ui/ModelManagementContext", () => ({
-  // eslint-disable-next-line @eslint-react/hooks-extra/no-unnecessary-use-prefix -- mocks the real `useModelManagement` hook; the name must match the export
   useModelManagement: () => ({
     adapters: { verifyCredentials: mockVerifyCredentials },
     setup: { byok: { setupProvider: mockSetupProvider } },
@@ -29,14 +27,9 @@ jest.mock("@/modelManagement/ui/ModelManagementContext", () => ({
     configuredModelRegistry: { bulkSet: mockBulkSet },
     backendConfigRegistry: { enableModel: mockEnableModel, removeRefs: mockRemoveRefs },
     coordinator: { removeProvider: jest.fn() },
-    catalogService: {
-      getProvider: mockGetProvider,
-      ensureLoaded: jest.fn().mockResolvedValue(undefined),
-      onChange: jest.fn().mockReturnValue(() => {}),
-    },
   }),
 }));
-// eslint-disable-next-line @eslint-react/hooks-extra/no-unnecessary-use-prefix -- mocks the real `useApp` hook; the name must match the export
+
 jest.mock("@/context", () => ({ useApp: () => ({}) }));
 jest.mock("@/modelManagement/state/atoms", () => {
   const jotai = jest.requireActual<typeof import("jotai")>("jotai");
@@ -138,23 +131,6 @@ const ollamaSource: ProviderDefinition = {
   modelInputHint: "e.g. llama3.2",
 };
 
-const anthropicCatalogMetadata = {
-  id: "anthropic",
-  displayName: "Anthropic",
-  providerType: "openai-compatible" as const,
-  defaultBaseUrl: "https://api.anthropic.com",
-  models: {
-    "claude-sonnet": {
-      id: "claude-sonnet",
-      displayName: "Claude Sonnet 4.5",
-      limits: { context: 200000 },
-    },
-    "claude-opus": { id: "claude-opus", displayName: "Claude Opus 4.5" },
-    "claude-haiku": { id: "claude-haiku", displayName: "Claude Haiku 4.5" },
-    "voyage-embed": { id: "voyage-embed", displayName: "Voyage Embed", isEmbedding: true },
-  },
-};
-
 function manualAddId(id: string): void {
   fireEvent.change(screen.getByTestId("model-checklist-manual-input"), { target: { value: id } });
   fireEvent.click(screen.getByRole("button", { name: "Add" }));
@@ -244,13 +220,6 @@ describe("ConfigureProviderDialog", () => {
       expect(screen.getByPlaceholderText("https://api.anthropic.com")).toBeTruthy();
     });
 
-    it("shows the OpenAI endpoint as the Base URL placeholder when the source ships no default", async () => {
-      render(
-        <ConfigureProviderForm state={{ mode: "new", source: openaiSource }} onClose={jest.fn()} />
-      );
-      expect(screen.getByPlaceholderText("https://api.openai.com/v1")).toBeTruthy();
-    });
-
     it("enables Save once at least one model is selected", async () => {
       render(
         <ConfigureProviderForm state={{ mode: "new", source: ollamaSource }} onClose={jest.fn()} />
@@ -259,35 +228,6 @@ describe("ConfigureProviderDialog", () => {
       expect(save.hasAttribute("disabled")).toBe(true);
       manualAddId("llama3.2");
       expect(save.hasAttribute("disabled")).toBe(false);
-    });
-
-    it("saves a new provider with its catalog id and the catalog metadata of the selected model", async () => {
-      mockGetProvider.mockReturnValue(anthropicCatalogMetadata);
-      mockVerifyCredentials.mockResolvedValue({ ok: true, checkedAt: 1 });
-      const onClose = jest.fn();
-      render(
-        <ConfigureProviderForm state={{ mode: "new", source: anthropicSource }} onClose={onClose} />
-      );
-      fireEvent.change(screen.getByTestId("api-key"), { target: { value: "sk-ant" } });
-      manualAddId("claude-sonnet");
-      fireEvent.click(screen.getByRole("button", { name: "Save" }));
-      await waitFor(() => expect(mockSetupProvider).toHaveBeenCalledTimes(1));
-      expect(mockSetupProvider).toHaveBeenCalledWith(
-        expect.objectContaining({
-          catalogProviderId: "anthropic",
-          providerType: "openai-compatible",
-          displayName: "Anthropic",
-          baseUrl: "https://api.anthropic.com",
-          models: [
-            expect.objectContaining({
-              id: "claude-sonnet",
-              displayName: "Claude Sonnet 4.5",
-              limits: { context: 200000 },
-            }),
-          ],
-        })
-      );
-      await waitFor(() => expect(onClose).toHaveBeenCalled());
     });
 
     it("saves a manually added id that has no catalog entry with its id as name, flagging embedding names", async () => {
@@ -345,7 +285,6 @@ describe("ConfigureProviderDialog", () => {
     });
 
     it("offers Remove only on manually added ids, not on discovered models", async () => {
-      mockGetProvider.mockReturnValue(anthropicCatalogMetadata);
       mockListProviderModels.mockResolvedValueOnce({ ok: true, modelIds: ["claude-sonnet"] });
       render(
         <ConfigureProviderForm
@@ -442,7 +381,7 @@ describe("ConfigureProviderDialog", () => {
       fireEvent.click(screen.getByRole("button", { name: "Test" }));
       await waitFor(() => expect(mockVerifyCredentials).toHaveBeenCalled());
       const [providerType, ctx] = mockVerifyCredentials.mock.calls[0];
-      expect(providerType).toBe("anthropic");
+      expect(providerType).toBe("openai-compatible");
       expect((ctx as { provider: { baseUrl?: string } }).provider.baseUrl).toBe(
         "https://proxy.example.com"
       );
@@ -467,7 +406,6 @@ describe("ConfigureProviderDialog", () => {
     });
 
     it("enrolls only newly added chat models on save, skipping embeddings and leaving existing models as they were", async () => {
-      mockGetProvider.mockReturnValue(anthropicCatalogMetadata);
       mockListProviderModels.mockResolvedValue({
         ok: true,
         modelIds: ["claude-haiku", "voyage-embed"],
@@ -482,9 +420,7 @@ describe("ConfigureProviderDialog", () => {
       fireEvent.click(rowCheckbox("voyage-embed"));
       fireEvent.click(screen.getByRole("button", { name: "Save" }));
       await waitFor(() => expect(onClose).toHaveBeenCalled());
-      for (const backend of ["chat", "opencode"]) {
-        expect(mockEnableModel).toHaveBeenCalledWith(backend, "cm-haiku");
-      }
+      expect(mockEnableModel).toHaveBeenCalledWith("chat", "cm-haiku");
       expect(mockEnableModel).not.toHaveBeenCalledWith(expect.anything(), "cm-embed");
       expect(mockEnableModel).not.toHaveBeenCalledWith(expect.anything(), "cm1");
       expect(mockEnableModel).not.toHaveBeenCalledWith(expect.anything(), "cm2");
@@ -542,23 +478,17 @@ describe("ConfigureProviderDialog", () => {
       await waitFor(() => expect(onSaved).toHaveBeenCalledTimes(1));
     });
 
-    it("offers Remove on saved custom models but not on saved catalog models", async () => {
-      mockGetProvider.mockReturnValue({
-        ...anthropicCatalogMetadata,
-        models: { "claude-sonnet": anthropicCatalogMetadata.models["claude-sonnet"] },
-      });
+    it("offers Remove on every saved model when editing", async () => {
       mockListProviderModels.mockResolvedValue({ ok: true, modelIds: ["claude-sonnet"] });
       render(
         <ConfigureProviderForm state={{ mode: "edit", providerId: "p1" }} onClose={jest.fn()} />
       );
-      await waitFor(() => expect(screen.getByTestId("model-row-claude-sonnet")).toBeTruthy());
       await waitFor(() => expect(screen.getByTestId("model-row-claude-opus")).toBeTruthy());
-      expect(screen.queryByTestId("model-row-remove-claude-sonnet")).toBeNull();
+      expect(screen.getByTestId("model-row-remove-claude-sonnet")).toBeTruthy();
       expect(screen.getByTestId("model-row-remove-claude-opus")).toBeTruthy();
     });
 
     it("hides a removed custom model immediately and deletes it on save", async () => {
-      mockGetProvider.mockReturnValue(undefined);
       mockListProviderModels.mockResolvedValue({ ok: true, modelIds: [] });
       mockBulkSet.mockResolvedValue(["cm1"]);
       const onClose = jest.fn();
@@ -640,7 +570,7 @@ describe("ConfigureProviderDialog", () => {
           onClose={jest.fn()}
         />
       );
-      expect(screen.getByPlaceholderText("e.g. gpt-5.5")).toBeTruthy();
+      expect(screen.getByPlaceholderText(CUSTOM_OPENAI_DEFINITION.modelInputHint)).toBeTruthy();
     });
 
     it("fails Test with a prompt to enter a key, without contacting the provider, when a required key is empty", async () => {

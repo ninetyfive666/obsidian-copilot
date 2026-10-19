@@ -1,8 +1,5 @@
 import { CustomModel } from "@/aiParams";
-import {
-  ChatModelProviders,
-  ModelCapability,
-} from "@/constants";
+import { ChatModelProviders, ModelCapability } from "@/constants";
 import { providerNeedsResolvedApiKey } from "@/modelManagement/providers/providerRequiresApiKey";
 import type { ConfiguredModel, Provider } from "@/modelManagement/types/persisted";
 
@@ -12,8 +9,7 @@ export const CATALOG_ID_TO_CHAT_PROVIDER: Record<string, ChatModelProviders> = {
 };
 
 export function mapProviderTypeToChatModelProvider(provider: Provider): ChatModelProviders {
-  const catalogId =
-    provider.origin.kind === "byok" ? provider.origin.catalogProviderId : undefined;
+  const catalogId = provider.origin.kind === "byok" ? provider.origin.catalogProviderId : undefined;
   return (catalogId && CATALOG_ID_TO_CHAT_PROVIDER[catalogId]) || ChatModelProviders.OPENAI_FORMAT;
 }
 

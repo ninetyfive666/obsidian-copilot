@@ -17,11 +17,10 @@ jest.mock("@/modelManagement", () => ({
   backendsAtom: "backends",
   COPILOT_PLUS_MODELS: [],
   capabilitiesFromConfiguredInfo: () => [],
-  // eslint-disable-next-line @eslint-react/hooks-extra/no-unnecessary-use-prefix -- mocks the public hook
+
   useModelManagement: () => ({ backendConfigRegistry: { enableModel, disableModel } }),
 }));
 jest.mock("jotai", () => ({
-  // eslint-disable-next-line @eslint-react/hooks-extra/no-unnecessary-use-prefix -- mocks the public hook
   useAtomValue: (atom: string) => ({ models, providers, backends })[atom],
 }));
 

@@ -161,69 +161,66 @@ const LexicalEditor: React.FC<LexicalEditorProps> = ({
     <LexicalComposer initialConfig={initialConfig}>
       <ActiveFileProvider currentActiveFile={currentActiveFile}>
         <div className="tw-relative">
-            <span id={editorLabelId} className="tw-sr-only">
-              Chat input
-            </span>
-            <PlainTextPlugin
-              contentEditable={
-                <ContentEditable
-                  className="tw-max-h-60 tw-min-h-[60px] tw-w-full tw-resize-none tw-overflow-y-auto tw-rounded-md tw-border-none tw-bg-transparent tw-px-2 tw-text-sm tw-text-normal tw-outline-none focus-visible:tw-ring-0"
-                  aria-labelledby={editorLabelId}
-                />
-              }
-              placeholder={
-                <div className="tw-pointer-events-none tw-absolute tw-left-2 tw-top-0 tw-select-none tw-text-sm tw-text-muted/60">
-                  {placeholder}
-                </div>
-              }
-              ErrorBoundary={LexicalErrorBoundary}
-            />
-            {/* Selection-only changes must not push stale text over an external clear.
+          <span id={editorLabelId} className="tw-sr-only">
+            Chat input
+          </span>
+          <PlainTextPlugin
+            contentEditable={
+              <ContentEditable
+                className="tw-max-h-60 tw-min-h-[60px] tw-w-full tw-resize-none tw-overflow-y-auto tw-rounded-md tw-border-none tw-bg-transparent tw-px-2 tw-text-sm tw-text-normal tw-outline-none focus-visible:tw-ring-0"
+                aria-labelledby={editorLabelId}
+              />
+            }
+            placeholder={
+              <div className="tw-pointer-events-none tw-absolute tw-left-2 tw-top-0 tw-select-none tw-text-sm tw-text-muted/60">
+                {placeholder}
+              </div>
+            }
+            ErrorBoundary={LexicalErrorBoundary}
+          />
+          {/* Selection-only changes must not push stale text over an external clear.
                 https://github.com/logancyang/obsidian-copilot-preview/issues/211 */}
-            <OnChangePlugin onChange={handleEditorChange} ignoreSelectionChange />
-            <HistoryPlugin />
-            <KeyboardPlugin
-              onSubmit={onSubmit}
-              sendShortcut={settings.defaultSendShortcut}
-              onEscape={onEscape}
-              onShiftTab={onShiftTab}
-            />
-            <ValueSyncPlugin value={value} />
-            <FocusPlugin onFocus={handleFocusRegistration} onEditorReady={handleEditorReady} />
-            <NotePillSyncPlugin onNotesChange={onNotesChange} onNotesRemoved={onNotesRemoved} />
-            {onURLsChange && (
-              <URLPillSyncPlugin onURLsChange={onURLsChange} onURLsRemoved={onURLsRemoved} />
-            )}
-            <ToolPillSyncPlugin onToolsChange={onToolsChange} />
-            <FolderPillSyncPlugin
-              onFoldersChange={onFoldersChange}
-              onFoldersRemoved={onFoldersRemoved}
-            />
-            <ActiveNotePillSyncPlugin
-              onActiveNoteAdded={onActiveNoteAdded}
-              onActiveNoteRemoved={onActiveNoteRemoved}
-            />
-            <WebTabPillSyncPlugin
-              onWebTabsChange={onWebTabsChange}
-              onActiveWebTabAdded={onActiveWebTabAdded}
-              onActiveWebTabRemoved={onActiveWebTabRemoved}
-            />
-            <PillDeletionPlugin />
-            <PastePlugin enableURLPills={!!onURLsChange} onImagePaste={onImagePaste} />
-            <SlashCommandPlugin />
-            <NoteCommandPlugin
-              isCopilotPlus={isCopilotPlus}
-              currentActiveFile={currentActiveFile}
-            />
-            {currentChain && currentChain !== ChainType.LLM_CHAIN && (
-              <TagCommandPlugin onTagSelected={onTagSelected} />
-            )}
-            <AtMentionCommandPlugin
-              isCopilotPlus={isCopilotPlus}
-              showTools={showTools}
-              currentActiveFile={currentActiveFile}
-            />
-            <TextInsertionPlugin />
+          <OnChangePlugin onChange={handleEditorChange} ignoreSelectionChange />
+          <HistoryPlugin />
+          <KeyboardPlugin
+            onSubmit={onSubmit}
+            sendShortcut={settings.defaultSendShortcut}
+            onEscape={onEscape}
+            onShiftTab={onShiftTab}
+          />
+          <ValueSyncPlugin value={value} />
+          <FocusPlugin onFocus={handleFocusRegistration} onEditorReady={handleEditorReady} />
+          <NotePillSyncPlugin onNotesChange={onNotesChange} onNotesRemoved={onNotesRemoved} />
+          {onURLsChange && (
+            <URLPillSyncPlugin onURLsChange={onURLsChange} onURLsRemoved={onURLsRemoved} />
+          )}
+          <ToolPillSyncPlugin onToolsChange={onToolsChange} />
+          <FolderPillSyncPlugin
+            onFoldersChange={onFoldersChange}
+            onFoldersRemoved={onFoldersRemoved}
+          />
+          <ActiveNotePillSyncPlugin
+            onActiveNoteAdded={onActiveNoteAdded}
+            onActiveNoteRemoved={onActiveNoteRemoved}
+          />
+          <WebTabPillSyncPlugin
+            onWebTabsChange={onWebTabsChange}
+            onActiveWebTabAdded={onActiveWebTabAdded}
+            onActiveWebTabRemoved={onActiveWebTabRemoved}
+          />
+          <PillDeletionPlugin />
+          <PastePlugin enableURLPills={!!onURLsChange} onImagePaste={onImagePaste} />
+          <SlashCommandPlugin />
+          <NoteCommandPlugin isCopilotPlus={isCopilotPlus} currentActiveFile={currentActiveFile} />
+          {currentChain && currentChain !== ChainType.LLM_CHAIN && (
+            <TagCommandPlugin onTagSelected={onTagSelected} />
+          )}
+          <AtMentionCommandPlugin
+            isCopilotPlus={isCopilotPlus}
+            showTools={showTools}
+            currentActiveFile={currentActiveFile}
+          />
+          <TextInsertionPlugin />
         </div>
       </ActiveFileProvider>
     </LexicalComposer>

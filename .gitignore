@@ -9,8 +9,7 @@
 node_modules
 .npm-cache/
 
-# Don't include the compiled main.js file in the repo.
-# They should be uploaded to GitHub releases instead.
+# Compiled plugin output (build artifacts, not source)
 main.js
 styles.css
 
@@ -28,9 +27,8 @@ data/
 # Environment files
 .env*
 
-# Claude configuration
-.claude/settings.local.json
-.claude/worktrees/
+# Claude Code local configuration
+.claude/
 
 # Development session tracking
 TODO.md

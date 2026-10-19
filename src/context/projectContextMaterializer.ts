@@ -294,7 +294,6 @@ const UNSUPPORTED_BINARY_FILE_PREFIX = "[Unsupported:";
 
 function decodeLocalText(bytes: ArrayBuffer, ext: string): string {
   const content = new TextDecoder("utf-8", { fatal: false }).decode(bytes);
-  // Binary payloads decode to replacement characters; only clean text becomes context.
   if (content.includes("\uFFFD") || content.includes("\u0000")) {
     throw new Error(
       `${UNSUPPORTED_BINARY_FILE_PREFIX} .${ext} cannot be converted offline. This plugin only reads plain-text notes.]`

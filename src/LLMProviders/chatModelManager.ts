@@ -29,11 +29,11 @@ type ChatConstructorType = {
   new (config: Record<string, unknown>): BaseChatModel;
 };
 
-const CHAT_PROVIDER_CONSTRUCTORS = {
+const CHAT_PROVIDER_CONSTRUCTORS: Record<string, ChatConstructorType | undefined> = {
   [ChatModelProviders.OLLAMA]: ChatOllama,
   [ChatModelProviders.LM_STUDIO]: ChatLMStudio,
   [ChatModelProviders.OPENAI_FORMAT]: ChatOpenAI,
-} as const;
+};
 
 export default class ChatModelManager {
   private static instance: ChatModelManager;
@@ -83,7 +83,7 @@ export default class ChatModelManager {
       ...(maxTokens === undefined ? {} : { maxTokens }),
     };
 
-    if (customModel.provider === ChatModelProviders.OLLAMA) {
+    if ((customModel.provider as ChatModelProviders) === ChatModelProviders.OLLAMA) {
       return {
         ...baseConfig,
         model: modelName,
@@ -98,7 +98,7 @@ export default class ChatModelManager {
       };
     }
 
-    if (customModel.provider === ChatModelProviders.LM_STUDIO) {
+    if ((customModel.provider as ChatModelProviders) === ChatModelProviders.LM_STUDIO) {
       return {
         ...baseConfig,
         modelName,
@@ -170,9 +170,7 @@ export default class ChatModelManager {
   }
 
   getProviderConstructor(model: CustomModel): ChatConstructorType {
-    const constructor: ChatConstructorType = CHAT_PROVIDER_CONSTRUCTORS[
-      model.provider as ChatModelProviders
-    ] as unknown as ChatConstructorType;
+    const constructor = CHAT_PROVIDER_CONSTRUCTORS[model.provider];
     if (!constructor) {
       logWarn(`Unknown provider: ${model.provider} for model: ${model.name}`);
       throw new Error(`Unknown provider: ${model.provider} for model: ${model.name}`);

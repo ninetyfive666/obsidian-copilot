@@ -1,5 +1,5 @@
 import type { CustomModel } from "@/aiParams";
-import { ChatModelProviders, DEFAULT_MAX_OUTPUT_TOKENS } from "@/constants";
+import { ChatModelProviders } from "@/constants";
 
 import * as obsidianModule from "obsidian";
 
@@ -130,7 +130,6 @@ describe("chatModelManager", () => {
 
         expect(body().max_tokens).toBe(8192);
       });
-
     });
   });
 });

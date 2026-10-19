@@ -3,7 +3,6 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import React from "react";
 
-/* eslint-disable @eslint-react/hooks-extra/no-unnecessary-use-prefix */
 jest.mock("@/aiParams", () => ({
   useChainType: () => ["llm_chain", jest.fn()],
 }));
@@ -20,7 +19,6 @@ jest.mock("@/components/chat-components/ChatSettingsPopover", () => ({
 jest.mock("@/components/chat-components/TokenCounter", () => ({
   TokenCounter: () => null,
 }));
-/* eslint-enable @eslint-react/hooks-extra/no-unnecessary-use-prefix */
 
 describe("ChatControls", () => {
   beforeAll(() => {

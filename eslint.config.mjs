@@ -667,6 +667,7 @@ export default [
     files: ["**/*.test.{ts,tsx}"],
     rules: {
       "@typescript-eslint/unbound-method": "off",
+      "@eslint-react/hooks-extra/no-unnecessary-use-prefix": "off",
     },
   },
 

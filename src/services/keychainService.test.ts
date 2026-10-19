@@ -176,7 +176,9 @@ describe("keychainService", () => {
           makeSettings({ openAIApiKey: "stale-disk-value" })
         );
 
-        expect((result.settings as unknown as Record<string, string>).openAIApiKey).toBe("kc-value");
+        expect((result.settings as unknown as Record<string, string>).openAIApiKey).toBe(
+          "kc-value"
+        );
         expect(secretStorage.setSecret).not.toHaveBeenCalled();
       });
 
@@ -228,7 +230,7 @@ describe("keychainService", () => {
         const service = KeychainService.getInstance(makeApp({ secretStorage }));
 
         const result = await service.hydrateFromKeychain(
-          makeSettings({ legacyProviderApiKey: "" } as unknown as Partial<CopilotSettings>)
+          makeSettings({ legacyProviderApiKey: "" })
         );
 
         expect((result.settings as unknown as Record<string, string>).legacyProviderApiKey).toBe(

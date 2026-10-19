@@ -90,7 +90,11 @@ describe("configuredModelToCustomModel", () => {
       const custom = configuredModelToCustomModel({
         provider: provider({ origin: { kind: "byok" } }),
         configuredModel: configuredModel({
-          info: { id: "llama3.1:8b", displayName: "Llama 3.1 8B", limits: { context: 400000, output: 128000 } },
+          info: {
+            id: "llama3.1:8b",
+            displayName: "Llama 3.1 8B",
+            limits: { context: 400000, output: 128000 },
+          },
         }),
         apiKey: null,
       });

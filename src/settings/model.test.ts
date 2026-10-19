@@ -15,7 +15,6 @@ import {
   settingsStore,
   validateCopilotFolder,
   CopilotSettings,
-  getModelKeyFromModel,
 } from "@/settings/model";
 import { CustomModel } from "@/aiParams";
 
@@ -308,7 +307,12 @@ describe("model", () => {
     it("renames retired autonomous agent tool ids and drops the retired web tools (https://github.com/Brevilabs/obsidian-copilot-private/issues/283)", () => {
       const out = sanitizeSettings({
         ...DEFAULT_SETTINGS,
-        autonomousAgentEnabledToolIds: ["writeToFile", "webSearch", "youtubeTranscription", "search"],
+        autonomousAgentEnabledToolIds: [
+          "writeToFile",
+          "webSearch",
+          "youtubeTranscription",
+          "search",
+        ],
       });
 
       expect(out.autonomousAgentEnabledToolIds).toEqual(["writeFile", "search"]);

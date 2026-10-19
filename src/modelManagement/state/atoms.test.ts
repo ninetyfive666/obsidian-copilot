@@ -68,7 +68,10 @@ describe("atoms", () => {
 
     it("does not touch the underlying byokProvidersAtom", () => {
       expect(
-        settingsStore.get(byokProvidersAtom).map((p) => p.providerId).sort()
+        settingsStore
+          .get(byokProvidersAtom)
+          .map((p) => p.providerId)
+          .sort()
       ).toEqual(["lmstudio", "ollama"]);
     });
 

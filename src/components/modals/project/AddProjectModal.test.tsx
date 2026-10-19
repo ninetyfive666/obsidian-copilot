@@ -30,14 +30,11 @@ jest.mock("@/instructions/agentsFile", () => ({
     writeAgentsFile(app, folder, content),
 }));
 
-/* eslint-disable @eslint-react/hooks-extra/no-unnecessary-use-prefix -- module mocks must keep
-   the mocked hooks' exported names. */
 jest.mock("@/context", () => ({ useApp: () => ({ vault: {} }) }));
 jest.mock("@/utils", () => ({
   ...jest.requireActual<Record<string, unknown>>("@/utils"),
   randomUUID: () => "new-project-id",
 }));
-/* eslint-enable @eslint-react/hooks-extra/no-unnecessary-use-prefix */
 
 import {
   AddProjectModalContent,

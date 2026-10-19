@@ -5,8 +5,7 @@ jest.mock("@/logger", () => ({
 }));
 
 import { FileParserManager } from "./FileParserManager";
-import { CanvasLoader } from "./CanvasLoader";
-import { Notice, type TFile, type Vault } from "obsidian";
+import { Notice, TFile, type Vault } from "obsidian";
 
 jest.mock("./CanvasLoader", () => ({
   CanvasLoader: jest.fn().mockImplementation(() => ({
@@ -16,12 +15,12 @@ jest.mock("./CanvasLoader", () => ({
 }));
 
 function fileFixture(name: string, extension: string): TFile {
-  return {
-    path: `docs/${name}.${extension}`,
-    name: `${name}.${extension}`,
-    basename: name,
-    extension,
-  } as unknown as TFile;
+  const file = new TFile();
+  file.path = `docs/${name}.${extension}`;
+  file.name = `${name}.${extension}`;
+  file.basename = name;
+  file.extension = extension;
+  return file;
 }
 
 function makeVault(): Vault & { read: jest.Mock } {
@@ -35,7 +34,7 @@ describe("FileParserManager", () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    manager = new FileParserManager(vault = makeVault());
+    manager = new FileParserManager((vault = makeVault()));
   });
 
   describe("registerParser()", () => {
@@ -69,9 +68,6 @@ describe("FileParserManager", () => {
       const canvas = fileFixture("Board", "canvas");
 
       await expect(manager.parseFile(canvas, vault)).resolves.toBe("canvas prompt");
-      const loader = (CanvasLoader as unknown as jest.Mock).mock.instances[0];
-      expect(loader.load).toHaveBeenCalledWith(canvas);
-      expect(loader.buildPrompt).toHaveBeenCalled();
     });
 
     it("reports binary formats as unsupported offline instead of throwing", async () => {

@@ -1,4 +1,4 @@
-import { FileSystemAdapter, TFolder, type App } from "obsidian";
+import { FileSystemAdapter, TFile, TFolder, type App } from "obsidian";
 import type { ContextCacheFs } from "./contextCacheFs";
 
 let mockFs: ContextCacheFs & { files: Map<string, string> };
@@ -73,16 +73,20 @@ function fakeApp(
   folders: string[] = [],
   readBinary: () => Promise<ArrayBuffer> = async () => new ArrayBuffer(4)
 ): App {
-  const tfiles = files.map((f) => ({
-    path: f.path,
-    extension: f.ext,
-    basename: f.path
+  const tfiles = files.map((f) => {
+    const file = new TFile();
+    file.path = f.path;
+    file.name = f.path.split("/").pop()!;
+    file.basename = f.path
       .split("/")
       .pop()!
-      .replace(/\.[^.]+$/, ""),
-    stat: { mtime: 1000, size: 10 },
-  }));
+      .replace(/\.[^.]+$/, "");
+    file.extension = f.ext;
+    file.stat = { ctime: 1000, mtime: 1000, size: 10 };
+    return file;
+  });
   const folderSet = new Set(folders);
+  const fileMap = new Map(tfiles.map((f) => [f.path, f]));
   const FsAdapter = FileSystemAdapter as unknown as new (basePath: string) => FileSystemAdapter;
   const Folder = TFolder as unknown as new (path: string) => TFolder;
   return {
@@ -90,8 +94,9 @@ function fakeApp(
       adapter: new FsAdapter("/vault"),
       getFiles: () => tfiles,
       getMarkdownFiles: () => tfiles.filter((f) => f.extension === "md"),
-      getAbstractFileByPath: (p: string) => (folderSet.has(p) ? new Folder(p) : null),
-      readBinary,
+      getAbstractFileByPath: (p: string) =>
+        fileMap.get(p) ?? (folderSet.has(p) ? new Folder(p) : null),
+      readBinary: jest.fn(readBinary),
     },
   } as unknown as App;
 }
@@ -239,7 +244,9 @@ describe("projectContextMaterializer", () => {
 
     it("reports resolve + per-loop progress through onProgress", async () => {
       getRecord.mockReturnValue(record({ inclusions: "Proj", webUrls: "https://example.com" }));
-      const app = fakeApp([{ path: "Proj/a.pdf", ext: "pdf" }], [], async () => textBytes("pdf text"));
+      const app = fakeApp([{ path: "Proj/a.pdf", ext: "pdf" }], [], async () =>
+        textBytes("pdf text")
+      );
 
       const progress: ContextMaterializeProgress[] = [];
       await ensureProjectContextMaterialized(app, "p1", CWD, (p) => progress.push(p));
@@ -264,14 +271,7 @@ describe("projectContextMaterializer", () => {
 
     it("dedupes concurrent calls for the same project to one run", async () => {
       getRecord.mockReturnValue(record({ inclusions: "Proj" }));
-      let release!: () => void;
-      const gate = new Promise<void>((resolve) => {
-        release = resolve;
-      });
-      const readBinary = jest.fn(async () => {
-        await gate;
-        return textBytes("content");
-      });
+      const readBinary = jest.fn(async () => textBytes("content"));
       const app = fakeApp([{ path: "Proj/a.pdf", ext: "pdf" }], [], readBinary);
 
       const [r1, r2] = await Promise.all([
@@ -365,7 +365,11 @@ describe("projectContextMaterializer", () => {
 
       const a = ensureProjectContextMaterialized(app, "p1", CWD);
       await flushMicrotasks();
-      const appB = fakeApp([{ path: "Proj/b.pdf", ext: "pdf" }], [], async () => textBytes("B text"));
+
+      getRecord.mockReturnValue(record({ inclusions: "Proj, Other" }));
+      const appB = fakeApp([{ path: "Proj/b.pdf", ext: "pdf" }], [], async () =>
+        textBytes("B text")
+      );
       const b = ensureProjectContextMaterialized(appB, "p1", CWD);
 
       release();
@@ -501,7 +505,7 @@ describe("projectContextMaterializer", () => {
         {
           source: "https://a.com",
           kind: "web",
-          error: expect.stringMatching(/network access/i),
+          error: expect.stringMatching(/network access/i) as string,
           usedStaleSnapshot: false,
         },
       ]);

@@ -19,13 +19,7 @@ import { $createActiveWebTabPillNode } from "@/components/chat-components/pills/
 import { logInfo } from "@/logger";
 import { AVAILABLE_TOOLS } from "@/components/chat-components/constants/tools";
 
-export type PillType =
-  | "notes"
-  | "tools"
-  | "folders"
-  | "active-note"
-  | "webTabs"
-  | "activeWebTab"
+export type PillType = "notes" | "tools" | "folders" | "active-note" | "webTabs" | "activeWebTab";
 
 export type ParsedContentType =
   | "text"

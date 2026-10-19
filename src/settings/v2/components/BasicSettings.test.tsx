@@ -15,7 +15,6 @@ jest.mock("@/context", () => {
     setting: { close: jest.fn() },
   };
   return {
-    // eslint-disable-next-line @eslint-react/hooks-extra/no-unnecessary-use-prefix -- mocks the real hook; name must match the export
     useApp: () => app,
   };
 });
@@ -31,7 +30,6 @@ jest.mock("@/instructions/agentsFile", () => ({
 
 const systemPrompts = jest.fn<{ title: string }[], []>().mockReturnValue([]);
 jest.mock("@/system-prompts/state", () => ({
-  // eslint-disable-next-line @eslint-react/hooks-extra/no-unnecessary-use-prefix -- mocks the real hook; name must match the export
   useSystemPrompts: () => systemPrompts(),
 }));
 

@@ -64,14 +64,15 @@ describe("commands", () => {
       const command = commands.find(({ id }) => id === COMMAND_IDS.OPEN_RELEVANT_NOTES_VIEW);
       void command?.callback?.();
       expect(
-        (plugin as unknown as { activateRelevantNotesView: jest.Mock })
-          .activateRelevantNotesView
+        (plugin as unknown as { activateRelevantNotesView: jest.Mock }).activateRelevantNotesView
       ).toHaveBeenCalled();
     });
 
     it("creates a new chat and clears the recorded prompt payload", () => {
       const { plugin, commands } = makePlugin();
-      (plugin as unknown as { newChat: jest.Mock }).newChat = jest.fn().mockResolvedValue(undefined);
+      (plugin as unknown as { newChat: jest.Mock }).newChat = jest
+        .fn()
+        .mockResolvedValue(undefined);
 
       registerCommands(plugin);
 
