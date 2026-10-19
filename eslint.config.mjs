@@ -202,10 +202,7 @@ export default [
       "node_modules/**",
       "main.js",
       "styles.css",
-      "dev/gallery/main.js",
-      "dev/gallery/styles.css",
       "data.json",
-      "designdocs/**",
       "docs/**",
       ".claude/**",
     ],
@@ -287,7 +284,7 @@ export default [
         {
           name: "app",
           message:
-            "Don't use the global `app` (footgun in popouts). Thread `app` via useApp() or a parameter. See designdocs/agents/PLUGIN_DEV_GUIDE.md.",
+            "Don't use the global `app` (footgun in popouts). Thread `app` via useApp() or a parameter.",
         },
       ],
 
@@ -348,14 +345,6 @@ export default [
   },
 
   {
-    files: ["dev/gallery/**/*.{ts,tsx}"],
-    ignores: ["dev/gallery/**/*.test.{ts,tsx}"],
-    rules: {
-      "no-restricted-syntax": ["error", restrictedBrowserStorage],
-    },
-  },
-
-  {
     files: ["src/**/*.test.{js,jsx,ts,tsx}"],
     rules: {
       "no-restricted-syntax": ["error", ...restrictedSourceImports],
@@ -397,39 +386,6 @@ export default [
   },
 
   {
-    files: ["dev/gallery/**/*.{ts,tsx}", "src/**/*.stories.{ts,tsx}"],
-    ignores: ["dev/gallery/**/*.test.{ts,tsx}"],
-    rules: {
-      "@typescript-eslint/no-restricted-imports": [
-        "error",
-        {
-          patterns: [
-            {
-              regex: "^\\.\\./",
-              allowTypeImports: true,
-              message:
-                "Gallery runtime and stories may not bypass the production import fence " +
-                "with parent-relative value imports. Use an allowed @/ path instead.",
-            },
-            {
-              regex:
-                "^@/(?!(?:(?:.*/)?ui/|components/modals/ReactModal$|" +
-                "components/gallery-hosts\\.fixtures$|context$|lib/[^/]+$|" +
-                "utils/react/mountPluginViewRoot$)).*",
-              allowTypeImports: true,
-              message:
-                "The gallery may only import production values from UI primitives, " +
-                "shared libraries, and its explicit Obsidian host/provider seams. " +
-                "Type-only imports are always fine. If a component needs plugin state " +
-                "to render, pass that state as story data instead of widening this boundary.",
-            },
-          ],
-        },
-      ],
-    },
-  },
-
-  {
     files: ["**/*.test.{js,jsx,ts,tsx}", "jest.setup.js", "__mocks__/**"],
     languageOptions: {
       globals: {
@@ -462,7 +418,6 @@ export default [
     files: [
       "*.{js,mjs,cjs}",
       "scripts/**",
-      "dev/gallery/esbuild.config.mjs",
       "esbuild.config.mjs",
       "version-bump.mjs",
       "wasmPlugin.mjs",

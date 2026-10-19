@@ -11,7 +11,7 @@ import {
 } from "./review-obsidian-package.mjs";
 
 const repositoryRoot = resolve(fileURLToPath(new URL("..", import.meta.url)));
-const reviewSourceRoots = ["src", "dev/gallery"];
+const reviewSourceRoots = ["src"];
 const reviewSourceExtensions = new Set([".cjs", ".js", ".jsx", ".mjs", ".ts", ".tsx"]);
 
 const invalidSourceFixture = `import "node:fs";

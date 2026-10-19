@@ -15,11 +15,7 @@ Notice that LM Studio doesn't require the user to do anything in the terminal wh
 
 Here's an example for Apple Metal macs. I can run 7B models blazingly fast on my tiny Macbook Air M1 2020 with 16GB RAM!
 
-<img src="./images/lm-studio.png" alt="LM Studio">
-
 In Copilot settings, open the **Models** tab, click **Add a provider**, pick **LM Studio**, and enter the model id from LM Studio — the connection is verified right away and the model shows up in your model picker.
-
-<img src="./images/lm-studio-model-pick.png" alt="LM Studio Model">
 
 ## Ollama
 
@@ -37,9 +33,7 @@ AFAIK `ollama serve` doesn't have a consolidated way to configure context window
 
 Remember that you MUST set this parameter for Ollama models, or they will silently fail and you will think your long prompt successfully reached the model!
 
-Look for this parameter `llama_new_context_with_model: n_ctx` in your server log, it is your true context window setting:
-
-<img src="./images/ollama-context-window.png" alt="Ollama context window">
+Look for this parameter `llama_new_context_with_model: n_ctx` in your server log, it is your true context window setting.
 
 #### Start Ollama server for Obsidian
 
@@ -69,11 +63,7 @@ Then, quit Ollama from the menu bar and reopen it.
 
 </details>
 
-<img src="./images/ollama-serve.png" alt="Ollama">
-
 Inside Copilot settings, open the **Models** tab, click **Add a provider**, pick **Ollama**, and enter the model name you pulled from Ollama, e.g. `mistral` — the connection is verified right away and the model shows up in your model picker.
-
-<img src="./images/ollama-setting.png" alt="Ollama">
 
 #### Ollama for Windows (Preview)
 

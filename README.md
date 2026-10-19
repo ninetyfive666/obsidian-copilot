@@ -4,8 +4,7 @@
 LLM servers</strong>. No cloud, no API keys, no accounts, no telemetry.</p>
 
 <p align="center">
-  <a href="./local_copilot.md">Local server setup guide</a> ·
-  <a href="./designdocs/agents/TESTING_GUIDE.md">Developer guides</a>
+  <a href="./local_copilot.md">Local server setup guide</a>
 </p>
 
 ---
@@ -59,9 +58,6 @@ npm run build      # typecheck + esbuild
 npm run lint       # eslint
 npm test           # jest
 ```
-
-See [`AGENTS.md`](./AGENTS.md) for repository conventions and
-[`designdocs/agents/`](./designdocs/agents/) for the detailed developer guides.
 
 ## License
 
