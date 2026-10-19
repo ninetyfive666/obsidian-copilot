@@ -1,6 +1,6 @@
 {
   "name": "obsidian-copilot",
-  "version": "4.0.14",
+  "version": "4.0.15",
   "description": "AI assistant for Obsidian that runs entirely on your local LLM servers (llama.cpp, Ollama, LM Studio, any OpenAI-compatible endpoint).",
   "main": "main.js",
   "scripts": {
