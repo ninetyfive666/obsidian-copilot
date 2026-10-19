@@ -109,5 +109,44 @@ describe("listOpenAICompatibleModels", () => {
       expect(result.ok).toBe(false);
       if (!result.ok) expect(result.message).not.toMatch(/add it to the base URL/);
     });
+
+    it("returns a suggestedBaseUrl when the model list works but chat is only served under /v1", async () => {
+      mockSafeFetch.mockImplementation(async (url: string) => {
+        if (url === "http://127.0.0.1:1234/models") {
+          return fakeResponse(200, { data: [{ id: "m1" }] });
+        }
+        if (url === "http://127.0.0.1:1234/chat/completions") {
+          return fakeResponse(404, undefined, "404 page not found");
+        }
+        if (url === "http://127.0.0.1:1234/v1/chat/completions") {
+          return fakeResponse(405, undefined, "");
+        }
+        return fakeResponse(404, undefined, "");
+      });
+      const result = await listOpenAICompatibleModels("http://127.0.0.1:1234");
+      expect(result).toEqual({
+        ok: true,
+        modelIds: ["m1"],
+        suggestedBaseUrl: "http://127.0.0.1:1234/v1",
+      });
+    });
+
+    it("returns no suggestion when the chat route answers at the base URL", async () => {
+      mockSafeFetch.mockImplementation(async (url: string) => {
+        if (url === "http://127.0.0.1:1234/models") return fakeResponse(200, { data: [] });
+        if (url === "http://127.0.0.1:1234/chat/completions")
+          return fakeResponse(405, undefined, "");
+        return fakeResponse(404, undefined, "");
+      });
+      const result = await listOpenAICompatibleModels("http://127.0.0.1:1234");
+      expect(result).toEqual({ ok: true, modelIds: [] });
+    });
+
+    it("returns no suggestion for a base that already carries /v1", async () => {
+      mockSafeFetch.mockResolvedValue(fakeResponse(200, { data: [{ id: "m1" }] }));
+      const result = await listOpenAICompatibleModels("http://127.0.0.1:1234/v1");
+      expect(result).toEqual({ ok: true, modelIds: ["m1"] });
+      expect(mockSafeFetch).toHaveBeenCalledTimes(1);
+    });
   });
 });

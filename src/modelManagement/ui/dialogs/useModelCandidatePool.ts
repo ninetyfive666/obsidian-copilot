@@ -25,6 +25,7 @@ export interface ModelCandidatePool {
   removedExistingIds: ReadonlySet<string>;
   fetching: boolean;
   fetchError: string | null;
+  baseUrlSuggestion: string | null;
   resolveModelInfo: (id: string) => ModelInfo;
   buildSelectedModelInfos: () => ModelInfo[];
   toggle: (wireId: string, next: boolean) => void;
@@ -53,6 +54,7 @@ export function useModelCandidatePool({
   const [removedExistingIds, setRemovedExistingIds] = useState<Set<string>>(() => new Set());
   const [fetching, setFetching] = useState(false);
   const [fetchError, setFetchError] = useState<string | null>(null);
+  const [baseUrlSuggestion, setBaseUrlSuggestion] = useState<string | null>(null);
 
   const existingByWireId = useMemo(
     () => new Map(existingModels.map((m) => [m.info.id, m.info])),
@@ -127,8 +129,10 @@ export function useModelCandidatePool({
         if (trulyNew.length > 0) {
           setFetchedIds((prev) => [...prev, ...trulyNew]);
         }
+        setBaseUrlSuggestion(result.suggestedBaseUrl ?? null);
       } else {
         setFetchError(result.message);
+        setBaseUrlSuggestion(null);
       }
     } catch (err) {
       setFetchError(err instanceof Error ? err.message : String(err));
@@ -207,6 +211,7 @@ export function useModelCandidatePool({
     removedExistingIds,
     fetching,
     fetchError,
+    baseUrlSuggestion,
     resolveModelInfo,
     buildSelectedModelInfos,
     toggle,

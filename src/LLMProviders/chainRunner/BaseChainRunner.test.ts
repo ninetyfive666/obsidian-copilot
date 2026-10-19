@@ -1,4 +1,4 @@
-import { ABORT_REASON, AI_SENDER } from "@/constants";
+import { ABORT_REASON, AI_SENDER, ChatModelProviders } from "@/constants";
 import type ChainManager from "@/LLMProviders/chainManager";
 import { BaseChainRunner } from "@/LLMProviders/chainRunner/BaseChainRunner";
 import type { ChatMessage } from "@/types/message";
@@ -107,6 +107,65 @@ describe("BaseChainRunner", () => {
 
         expect(addMessage).not.toHaveBeenCalled();
       });
+    });
+  });
+
+  describe("handleError()", () => {
+    it("appends a /v1 Base URL hint to a 404 from an OpenAI-format provider", async () => {
+      const chainManager = {
+        memoryManager: {
+          saveContext: jest.fn().mockResolvedValue(undefined),
+          getMemory: () => ({ chatHistory: { messages: [] } }),
+        },
+        chatModelManager: {
+          getActiveModel: () => ({
+            provider: ChatModelProviders.OPENAI_FORMAT,
+            baseUrl: "http://llm.home",
+          }),
+        },
+      } as unknown as ChainManager;
+      const runner = new TestChainRunner(chainManager);
+      const processErrorChunk = jest.fn();
+
+      await (
+        runner as unknown as {
+          handleError: (
+            error: unknown,
+            processErrorChunk: (message: string) => void
+          ) => Promise<void>;
+        }
+      ).handleError(new Error("404 404 page not found"), processErrorChunk);
+
+      expect(processErrorChunk).toHaveBeenCalledTimes(1);
+      const message = processErrorChunk.mock.calls[0][0] as string;
+      expect(message).toContain("404 page not found");
+      expect(message).toContain("http://llm.home/v1");
+    });
+
+    it("adds no /v1 hint when the active provider is not OpenAI-format", async () => {
+      const chainManager = {
+        memoryManager: {
+          saveContext: jest.fn().mockResolvedValue(undefined),
+          getMemory: () => ({ chatHistory: { messages: [] } }),
+        },
+        chatModelManager: {
+          getActiveModel: () => ({ provider: "ollama", baseUrl: "http://llm.home" }),
+        },
+      } as unknown as ChainManager;
+      const runner = new TestChainRunner(chainManager);
+      const processErrorChunk = jest.fn();
+
+      await (
+        runner as unknown as {
+          handleError: (
+            error: unknown,
+            processErrorChunk: (message: string) => void
+          ) => Promise<void>;
+        }
+      ).handleError(new Error("404 404 page not found"), processErrorChunk);
+
+      const message = processErrorChunk.mock.calls[0][0] as string;
+      expect(message).not.toContain("/v1");
     });
   });
 });

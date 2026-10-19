@@ -1,4 +1,5 @@
 import { ABORT_REASON, AI_SENDER } from "@/constants";
+import { withV1BaseHint } from "@/errorFormat";
 import { logError, logInfo } from "@/logger";
 import { ChatMessage, ResponseMetadata } from "@/types/message";
 import { err2String, formatDateTime } from "@/utils";
@@ -143,7 +144,7 @@ export abstract class BaseChainRunner implements ChainRunner {
         "\nError Details: " +
         errorMessage;
     }
-    return errorMessage;
+    return withV1BaseHint(errorMessage, this.chainManager.chatModelManager.getActiveModel());
   }
 
   private isAuthenticationError(error: unknown, normalizedMessage: string): boolean {

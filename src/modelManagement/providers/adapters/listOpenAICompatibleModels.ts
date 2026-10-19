@@ -1,3 +1,4 @@
+import { probeChatRoute } from "./chatRouteProbe";
 import {
   fetchWithListModelsTimeout,
   parseModelListResponse,
@@ -28,7 +29,12 @@ export async function listOpenAICompatibleModels(
   if (opts.openAIOrgId) headers["OpenAI-Organization"] = opts.openAIOrgId;
 
   const result = await attempt(base, headers, opts.timeoutMs);
-  if (result.ok) return { ok: true, modelIds: result.modelIds };
+  if (result.ok) {
+    const probe = await probeChatRoute(base, headers, opts.timeoutMs);
+    return probe.needsV1
+      ? { ok: true, modelIds: result.modelIds, suggestedBaseUrl: probe.suggestedBaseUrl }
+      : { ok: true, modelIds: result.modelIds };
+  }
 
   const looksLikeMissingV1 = result.status === 404 && !/\/v1(\/|$)/.test(base);
   const message = looksLikeMissingV1

@@ -14,6 +14,7 @@ import { byokProvidersAtom, configuredModelsAtom } from "@/modelManagement/state
 import type { ModelInfo, ProviderType } from "@/modelManagement/types/catalog";
 import type { ConfiguredModel, Provider } from "@/modelManagement/types/persisted";
 import type { ProviderDefinition, VerificationResult } from "@/modelManagement/types/runtime";
+import { BaseUrlV1Suggestion } from "@/modelManagement/ui/components/BaseUrlV1Suggestion";
 import { CorsCompatibilitySetting } from "@/modelManagement/ui/components/CorsCompatibilitySetting";
 import { ModelChecklist } from "@/modelManagement/ui/components/ModelChecklist";
 import {
@@ -342,7 +343,8 @@ const ConfigureProviderBody: React.FC<ConfigureProviderBodyProps> = ({
     pool.selectedWireIds.size > 0 &&
     !missingCustomBaseUrl &&
     !missingRequiredKey &&
-    !verificationBlocksSave;
+    !verificationBlocksSave &&
+    !pool.baseUrlSuggestion;
 
   const testFailed = verification?.ok === false;
 
@@ -422,6 +424,16 @@ const ConfigureProviderBody: React.FC<ConfigureProviderBodyProps> = ({
             }}
             placeholder={defaultBaseUrl}
           />
+          {pool.baseUrlSuggestion && (
+            <BaseUrlV1Suggestion
+              suggestedBaseUrl={pool.baseUrlSuggestion}
+              onApply={(next) => {
+                setBaseUrl(next);
+                setVerification(null);
+                void pool.fetchModels();
+              }}
+            />
+          )}
         </FormField>
 
         <CorsCompatibilitySetting checked={enableCors} onCheckedChange={setEnableCors} />
@@ -484,6 +496,7 @@ const CONCLUSIVE_VERIFICATION_FAILURE_CODES: readonly string[] = [
   "invalid_api_key",
   "missing_api_key",
   "missing_base_url",
+  "chat_route_needs_v1",
 ];
 
 function isConclusiveVerificationFailure(code: string | undefined): boolean {

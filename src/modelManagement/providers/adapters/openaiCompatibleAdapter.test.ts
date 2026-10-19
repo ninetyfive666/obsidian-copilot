@@ -125,5 +125,49 @@ describe("openaiCompatibleAdapter", () => {
         expect(mockSafeFetch).not.toHaveBeenCalled();
       }
     );
+
+    it("reports chat_route_needs_v1 when the model list works but chat is only served under /v1", async () => {
+      mockSafeFetch.mockImplementation(async (url: string) => {
+        if (url === "http://llm.home/models") {
+          return { status: 200, text: async () => "" } as Response;
+        }
+        if (url === "http://llm.home/chat/completions") {
+          return { status: 404, text: async () => "404 page not found" } as Response;
+        }
+        if (url === "http://llm.home/v1/chat/completions") {
+          return { status: 405, text: async () => "" } as Response;
+        }
+        throw new Error(`unexpected request to ${url}`);
+      });
+
+      const result = await openaiCompatibleAdapter.verifyCredentials({
+        provider: provider({ baseUrl: "http://llm.home" }),
+        apiKey: null,
+        extras: {},
+      });
+
+      expect(result).toMatchObject({ ok: false, code: "chat_route_needs_v1" });
+      expect(result.message).toContain("http://llm.home/v1");
+    });
+
+    it("passes verification when the model list works and the chat route exists at the base URL", async () => {
+      mockSafeFetch.mockImplementation(async (url: string) => {
+        if (url === "http://llm.home/models") {
+          return { status: 200, text: async () => "" } as Response;
+        }
+        if (url === "http://llm.home/chat/completions") {
+          return { status: 405, text: async () => "" } as Response;
+        }
+        throw new Error(`unexpected request to ${url}`);
+      });
+
+      const result = await openaiCompatibleAdapter.verifyCredentials({
+        provider: provider({ baseUrl: "http://llm.home" }),
+        apiKey: null,
+        extras: {},
+      });
+
+      expect(result.ok).toBe(true);
+    });
   });
 });
