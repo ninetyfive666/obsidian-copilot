@@ -103,3 +103,12 @@ Besides the built-in lexical search, Copilot can index your whole vault with a *
 - If you switch the embedding model, the old index is discarded and rebuilt once automatically (vectors from different models are not comparable).
 - While the index is still being built — or if the embedding server is unreachable — search transparently falls back to lexical results.
 - Excluded folders (your search inclusions/exclusions) are respected by the index.
+
+**Commands** (Command Palette):
+
+- **Copilot: Refresh local semantic index** — incremental update; embeds only new or changed notes.
+- **Copilot: Force reindex local semantic index** — deletes and rebuilds the whole index from scratch (with confirmation).
+- **Copilot: Clear local semantic index** — deletes the index; it stays empty until notes change again or you refresh (with confirmation).
+- **Copilot: List local semantic index files** — writes a status report (indexed / unindexed / empty / excluded notes) to a Markdown file and opens it.
+
+While an index run is active, a progress card appears above the chat input with **Pause** and **Stop** buttons.

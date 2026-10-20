@@ -9,6 +9,14 @@ import {
   type StoredNoteEntry,
 } from "./EmbeddingIndexStorage";
 import { LocalEmbeddingClient } from "./LocalEmbeddingClient";
+import {
+  addIndexingError,
+  type IndexingCompletionStatus,
+  resetIndexingProgressState,
+  setIndexingProgressState,
+  updateIndexedCountThrottled,
+  updateIndexingProgressState,
+} from "./indexingProgress";
 
 export type LocalEmbeddingIndexStatus = "idle" | "building" | "ready" | "error";
 
@@ -41,6 +49,8 @@ export class LocalEmbeddingIndex {
   private syncPromise: Promise<void> | null = null;
   private terminalWaiters: Array<() => void> = [];
   private disposed = false;
+  private pauseRequested = false;
+  private cancelRequested = false;
 
   constructor(
     private app: App,
@@ -59,6 +69,61 @@ export class LocalEmbeddingIndex {
 
   getChunkCount(): number {
     return this.chunks.size;
+  }
+
+  listIndexedNotes(): string[] {
+    return Array.from(this.notes.keys()).sort();
+  }
+
+  pause(): void {
+    this.pauseRequested = true;
+    updateIndexingProgressState({ isPaused: true });
+  }
+
+  resume(): void {
+    this.pauseRequested = false;
+    updateIndexingProgressState({ isPaused: false });
+  }
+
+  stop(): void {
+    this.pauseRequested = false;
+    this.cancelRequested = true;
+    updateIndexingProgressState({ isPaused: false });
+  }
+
+  async clear(): Promise<void> {
+    if (this.disposed) return;
+    if (this.syncPromise) {
+      this.cancelRequested = true;
+      await this.syncPromise;
+    }
+    this.pauseRequested = false;
+    this.cancelRequested = false;
+    await this.storage.clearAll();
+    this.notes.clear();
+    this.chunks.clear();
+    this.dimension = 0;
+    this.progress = { total: 0, done: 0 };
+    await this.persistManifest();
+    this.status = "ready";
+    this.notifyTerminal();
+  }
+
+  async forceRebuild(): Promise<number> {
+    if (this.disposed) return 0;
+    if (this.syncPromise) {
+      this.cancelRequested = true;
+      await this.syncPromise;
+    }
+    this.pauseRequested = false;
+    this.cancelRequested = false;
+    await this.storage.clearAll();
+    this.notes.clear();
+    this.chunks.clear();
+    this.dimension = 0;
+    await this.persistManifest();
+    await this.sync();
+    return this.notes.size;
   }
 
   async sync(): Promise<void> {
@@ -141,6 +206,7 @@ export class LocalEmbeddingIndex {
   dispose(): void {
     this.disposed = true;
     this.status = "idle";
+    this.cancelRequested = true;
     this.notes.clear();
     this.chunks.clear();
     this.dimension = 0;
@@ -148,9 +214,12 @@ export class LocalEmbeddingIndex {
     for (const waiter of this.terminalWaiters.splice(0)) {
       waiter();
     }
+    resetIndexingProgressState();
   }
 
   private async runSync(): Promise<void> {
+    this.pauseRequested = false;
+    this.cancelRequested = false;
     await this.restoreFromStorage();
 
     const { inclusions, exclusions } = getMatchingPatterns();
@@ -161,39 +230,75 @@ export class LocalEmbeddingIndex {
 
     this.status = "building";
     this.progress = { total: files.length, done: 0 };
+    setIndexingProgressState({
+      isActive: true,
+      isPaused: false,
+      indexedCount: 0,
+      totalFiles: files.length,
+      errors: [],
+      completionStatus: "none",
+    });
 
     let failures = 0;
     for (const file of files) {
-      if (this.disposed) return;
+      if (this.disposed) {
+        resetIndexingProgressState();
+        return;
+      }
+      if (this.cancelRequested) break;
+      await this.waitWhilePaused();
+      if (this.cancelRequested || this.disposed) break;
       if (!this.isUpToDate(file)) {
         try {
           await this.indexNote(file);
         } catch (error) {
           failures += 1;
+          const message = error instanceof Error ? error.message : String(error);
+          addIndexingError(`${file.path}: ${message}`);
           logWarn(`LocalEmbeddingIndex: failed to index ${file.path}`, error);
         }
       }
       this.progress.done += 1;
+      updateIndexedCountThrottled(this.progress.done);
       if (this.progress.done % YIELD_EVERY_NOTES === 0) {
         await new Promise((resolve) => window.setTimeout(resolve, 0));
       }
     }
 
     for (const notePath of Array.from(this.notes.keys())) {
+      if (this.disposed) break;
       if (currentPaths.has(notePath)) continue;
       await this.removeNote(notePath);
     }
 
-    if (this.disposed) return;
+    if (this.disposed) {
+      resetIndexingProgressState();
+      return;
+    }
     await this.persistManifest();
     const indexed = this.chunks.size > 0 || files.length === 0;
     this.status = indexed ? "ready" : "error";
-    if (failures > 0 || this.notes.size > 0) {
-      logInfo(
-        `LocalEmbeddingIndex: sync finished (${this.notes.size} notes, ${this.chunks.size} chunks, ${failures} failures)`
-      );
-    }
+    const completionStatus: IndexingCompletionStatus = this.cancelRequested
+      ? "cancelled"
+      : failures > 0 || !indexed
+        ? "error"
+        : "success";
+    logInfo(
+      `LocalEmbeddingIndex: sync finished (${this.notes.size} notes, ${this.chunks.size} chunks, ${failures} failures, ${completionStatus})`
+    );
     this.notifyTerminal();
+    updateIndexingProgressState({
+      isActive: false,
+      isPaused: false,
+      indexedCount: this.progress.done,
+      completionStatus,
+    });
+  }
+
+  private async waitWhilePaused(): Promise<void> {
+    while (this.pauseRequested && !this.cancelRequested && !this.disposed) {
+      await new Promise((resolve) => window.setTimeout(resolve, 200));
+    }
   }
 
   private async restoreFromStorage(): Promise<void> {

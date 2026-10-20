@@ -221,6 +221,10 @@ export const COMMAND_IDS = {
   OPEN_LOG_FILE: "open-log-file",
   CLEAR_LOG_FILE: "clear-log-file",
   TRIGGER_QUICK_ASK: "trigger-quick-ask",
+  CLEAR_LOCAL_SEMANTIC_INDEX: "clear-local-semantic-index",
+  REFRESH_LOCAL_SEMANTIC_INDEX: "refresh-local-semantic-index",
+  REINDEX_LOCAL_SEMANTIC_INDEX: "reindex-local-semantic-index",
+  LIST_SEMANTIC_INDEXED_FILES: "list-semantic-indexed-files",
 } as const;
 
 export const COMMAND_NAMES: Record<CommandId, string> = {
@@ -241,6 +245,10 @@ export const COMMAND_NAMES: Record<CommandId, string> = {
   [COMMAND_IDS.OPEN_LOG_FILE]: "Create log file",
   [COMMAND_IDS.CLEAR_LOG_FILE]: "Clear log file",
   [COMMAND_IDS.TRIGGER_QUICK_ASK]: "Quick Ask",
+  [COMMAND_IDS.CLEAR_LOCAL_SEMANTIC_INDEX]: "Clear local semantic index",
+  [COMMAND_IDS.REFRESH_LOCAL_SEMANTIC_INDEX]: "Refresh local semantic index",
+  [COMMAND_IDS.REINDEX_LOCAL_SEMANTIC_INDEX]: "Force reindex local semantic index",
+  [COMMAND_IDS.LIST_SEMANTIC_INDEXED_FILES]: "List local semantic index files",
 };
 
 export type CommandId = (typeof COMMAND_IDS)[keyof typeof COMMAND_IDS];
@@ -262,6 +270,10 @@ export const COMMAND_ICONS: Partial<Record<CommandId, string>> = {
   [COMMAND_IDS.COUNT_WORD_AND_TOKENS_SELECTION]: "hash",
   [COMMAND_IDS.OPEN_LOG_FILE]: "file-text",
   [COMMAND_IDS.CLEAR_LOG_FILE]: "file-x",
+  [COMMAND_IDS.CLEAR_LOCAL_SEMANTIC_INDEX]: "trash-2",
+  [COMMAND_IDS.REFRESH_LOCAL_SEMANTIC_INDEX]: "refresh-cw",
+  [COMMAND_IDS.REINDEX_LOCAL_SEMANTIC_INDEX]: "database",
+  [COMMAND_IDS.LIST_SEMANTIC_INDEXED_FILES]: "file-search",
 };
 
 export const TEXT_READABLE_EXTENSIONS = ["md", "canvas", "base"];

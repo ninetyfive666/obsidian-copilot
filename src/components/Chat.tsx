@@ -13,6 +13,7 @@ import type { WebTabContext } from "@/types/message";
 import { ChatControls } from "@/components/chat-components/ChatControls";
 import ChatInput from "@/components/chat-components/ChatModeInput";
 import ChatMessages, { isChatEmpty } from "@/components/chat-components/ChatMessages";
+import IndexingProgressCard from "@/components/IndexingProgressCard";
 import { useChatModelPicker } from "@/components/chat-components/useChatModelPicker";
 import {
   ABORT_REASON,
@@ -34,6 +35,12 @@ import CopilotPlugin from "@/main";
 import { getModelKeyFromModel, useSettingsValue } from "@/settings/model";
 import { ChatManagerChatUIState } from "@/state/ChatUIState";
 import { ChatMessage } from "@/types/message";
+import {
+  pauseLocalEmbeddingIndex,
+  resumeLocalEmbeddingIndex,
+  stopLocalEmbeddingIndex,
+} from "@/search/embeddings/localEmbeddingService";
+import { useIndexingProgress } from "@/search/embeddings/indexingProgress";
 import { err2String, isPlusChain, modelSupportsVision } from "@/utils";
 import { arrayBufferToBase64 } from "@/utils/base64";
 import { appendUniqueFiles } from "@/utils/fileListUtils";
@@ -106,7 +113,21 @@ const ChatInternal: React.FC<ChatProps & { chatInput: ReturnType<typeof useChatI
   );
   const [selectedImages, setSelectedImages] = useState<File[]>([]);
   const [chatHistoryItems, setChatHistoryItems] = useState<ChatHistoryItem[]>([]);
+  const [indexingCardVisible, setIndexingCardVisible] = useState<boolean | null>(null);
+  const indexingState = useIndexingProgress();
   const isMountedRef = useRef(false);
+
+  const prevIndexingActiveRef = useRef(indexingState.isActive);
+  useEffect(() => {
+    if (indexingState.isActive && !prevIndexingActiveRef.current) {
+      setIndexingCardVisible(true);
+    }
+    prevIndexingActiveRef.current = indexingState.isActive;
+  }, [indexingState.isActive]);
+
+  const showIndexingCard =
+    indexingCardVisible !== false &&
+    (indexingState.isActive || indexingState.completionStatus !== "none");
 
   const chatContainerRef = useRef<HTMLDivElement>(null);
 
@@ -692,6 +713,16 @@ const ChatInternal: React.FC<ChatProps & { chatInput: ReturnType<typeof useChatI
           onEdit={safeAsyncHandler(handleEdit)}
           onDelete={safeAsyncHandler(handleDelete)}
         />
+        {showIndexingCard && (
+          <div className="tw-px-4 tw-pb-2">
+            <IndexingProgressCard
+              onClose={() => setIndexingCardVisible(false)}
+              onPause={() => pauseLocalEmbeddingIndex()}
+              onResume={() => resumeLocalEmbeddingIndex()}
+              onStop={() => stopLocalEmbeddingIndex()}
+            />
+          </div>
+        )}
         <ChatControls
           onCopyChatLink={chatHistory.length > 0 && !loading ? handleCopyChatLink : undefined}
           onNewChat={() => void handleNewChat()}

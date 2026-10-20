@@ -6,6 +6,7 @@ import { getSettings, subscribeToSettingsChange } from "@/settings/model";
 import { EmbeddingIndexStorage } from "./EmbeddingIndexStorage";
 import { LocalEmbeddingClient, type EmbeddingConnection } from "./LocalEmbeddingClient";
 import { LocalEmbeddingIndex } from "./LocalEmbeddingIndex";
+import { resetIndexingProgressState } from "./indexingProgress";
 
 interface LocalEmbeddingServiceState {
   index: LocalEmbeddingIndex;
@@ -15,6 +16,7 @@ interface LocalEmbeddingServiceState {
 
 let state: LocalEmbeddingServiceState | null = null;
 let initialized = false;
+let appRef: App | null = null;
 let pendingRefreshes = new Set<string>();
 let refreshTimer: number | null = null;
 const REFRESH_DEBOUNCE_MS = 1500;
@@ -25,6 +27,7 @@ export function initLocalEmbeddings(
 ): void {
   if (initialized) return;
   initialized = true;
+  appRef = app;
 
   const sync = (): void => {
     void syncNow(app, modelManagement);
@@ -38,14 +41,53 @@ export function getLocalEmbeddingService(): LocalEmbeddingServiceState | null {
   return state;
 }
 
+export function pauseLocalEmbeddingIndex(): void {
+  state?.index.pause();
+}
+
+export function resumeLocalEmbeddingIndex(): void {
+  state?.index.resume();
+}
+
+export function stopLocalEmbeddingIndex(): void {
+  state?.index.stop();
+}
+
+export async function clearLocalEmbeddingIndex(): Promise<void> {
+  if (state) {
+    await state.index.clear();
+    return;
+  }
+  if (appRef) {
+    await new EmbeddingIndexStorage(appRef).clearAll();
+  }
+}
+
+export async function refreshLocalEmbeddingIndex(): Promise<number> {
+  if (!state) return 0;
+  await state.index.sync();
+  return state.index.listIndexedNotes().length;
+}
+
+export async function reindexLocalEmbeddingIndex(): Promise<number> {
+  if (!state) return 0;
+  return state.index.forceRebuild();
+}
+
+export function listIndexedNotes(): string[] | null {
+  return state ? state.index.listIndexedNotes() : null;
+}
+
 export function resetLocalEmbeddingsForTesting(): void {
   stopService();
   initialized = false;
+  appRef = null;
   pendingRefreshes.clear();
   if (refreshTimer) {
     window.clearTimeout(refreshTimer);
     refreshTimer = null;
   }
+  resetIndexingProgressState();
 }
 
 async function syncNow(

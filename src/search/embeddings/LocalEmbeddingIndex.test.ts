@@ -8,6 +8,7 @@ import {
 } from "./EmbeddingIndexStorage";
 import { LocalEmbeddingClient } from "./LocalEmbeddingClient";
 import { LocalEmbeddingIndex } from "./LocalEmbeddingIndex";
+import { getIndexingProgressState, resetIndexingProgressState } from "./indexingProgress";
 
 jest.mock("@/search/searchUtils", () => ({
   getMatchingPatterns: jest.fn(() => ({ inclusions: null, exclusions: null })),
@@ -77,6 +78,42 @@ function vectorClient(vectorsByContent: Map<string, number[]>) {
       texts.map((text) => new Float32Array(vectorsByContent.get(text) ?? [0, 0]))
     ),
   } as unknown as LocalEmbeddingClient;
+}
+
+interface GatedClient {
+  client: LocalEmbeddingClient;
+  embedMock: jest.Mock;
+  release: (text: string) => void;
+}
+
+function makeGatedClient(vectorsByContent: Map<string, number[]>): GatedClient {
+  const gates = new Map<string, () => void>();
+  const embedMock = jest.fn(
+    (texts: string[]) =>
+      new Promise<Float32Array[]>((resolve) => {
+        void Promise.all(
+          texts.map((text) => {
+            if (gates.has(text)) return Promise.resolve();
+            return new Promise<void>((release) => {
+              gates.set(text, release);
+            });
+          })
+        ).then(() => {
+          resolve(texts.map((text) => new Float32Array(vectorsByContent.get(text) ?? [0, 0])));
+        });
+      })
+  );
+  return {
+    client: { embed: embedMock } as unknown as LocalEmbeddingClient,
+    embedMock,
+    release: (text: string) => gates.get(text)?.(),
+  };
+}
+
+async function untilEmbedCalls(embedMock: jest.Mock, count: number): Promise<void> {
+  for (let i = 0; i < 100 && embedMock.mock.calls.length < count; i++) {
+    await new Promise((resolve) => window.setTimeout(resolve, 10));
+  }
 }
 
 interface StoredNoteData {
@@ -156,6 +193,7 @@ describe("LocalEmbeddingIndex", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     jest.mocked(shouldIndexFile).mockReturnValue(true);
+    resetIndexingProgressState();
   });
 
   it("indexes all notes on the first sync and persists a manifest", async () => {
@@ -356,5 +394,115 @@ describe("LocalEmbeddingIndex", () => {
     const index = makeIndex(notes, hanging, storage);
 
     await expect(index.waitForReady(20)).resolves.toBe(false);
+  });
+
+  it("pauses between notes and resumes on request", async () => {
+    const notes: FakeNote[] = [
+      { path: "a.md", content: "alpha" },
+      { path: "b.md", content: "beta" },
+    ];
+    const { client, embedMock, release } = makeGatedClient(
+      new Map([
+        ["chunk from a.md", [1, 0]],
+        ["chunk from b.md", [0, 1]],
+      ])
+    );
+    const storage = new FakeStorage();
+
+    const index = makeIndex(notes, client, storage);
+    const syncPromise = index.sync();
+    await untilEmbedCalls(embedMock, 1);
+    index.pause();
+    release("chunk from a.md");
+    await new Promise((resolve) => window.setTimeout(resolve, 50));
+
+    expect(embedMock.mock.calls.length).toBe(1);
+    expect(index.getStatus()).toBe("building");
+
+    index.resume();
+    await untilEmbedCalls(embedMock, 2);
+    release("chunk from b.md");
+    await syncPromise;
+
+    expect(index.getStatus()).toBe("ready");
+    expect(index.getChunkCount()).toBe(2);
+    expect(getIndexingProgressState().completionStatus).toBe("success");
+  });
+
+  it("stops the sync and keeps the partial index", async () => {
+    const notes: FakeNote[] = [
+      { path: "a.md", content: "alpha" },
+      { path: "b.md", content: "beta" },
+    ];
+    const { client, embedMock, release } = makeGatedClient(
+      new Map([
+        ["chunk from a.md", [1, 0]],
+        ["chunk from b.md", [0, 1]],
+      ])
+    );
+    const storage = new FakeStorage();
+
+    const index = makeIndex(notes, client, storage);
+    const syncPromise = index.sync();
+    await untilEmbedCalls(embedMock, 1);
+    index.stop();
+    release("chunk from a.md");
+    await syncPromise;
+
+    expect(embedMock.mock.calls.length).toBe(1);
+    expect(index.getStatus()).toBe("ready");
+    expect(index.listIndexedNotes()).toEqual(["a.md"]);
+    expect(storage.notes.has("b.md")).toBe(false);
+    expect(getIndexingProgressState().completionStatus).toBe("cancelled");
+  });
+
+  it("clear empties the index and the persisted storage", async () => {
+    const notes: FakeNote[] = [
+      { path: "a.md", content: "alpha" },
+      { path: "b.md", content: "beta" },
+    ];
+    const client = vectorClient(
+      new Map([
+        ["chunk from a.md", [1, 0]],
+        ["chunk from b.md", [0, 1]],
+      ])
+    );
+    const storage = new FakeStorage();
+
+    const index = makeIndex(notes, client, storage);
+    await index.sync();
+    await index.clear();
+
+    expect(index.getChunkCount()).toBe(0);
+    expect(index.listIndexedNotes()).toEqual([]);
+    expect(index.getStatus()).toBe("ready");
+    expect(storage.notes.size).toBe(0);
+    expect(storage.manifest?.notes).toEqual({});
+  });
+
+  it("forceRebuild re-embeds every note from scratch", async () => {
+    const notes: FakeNote[] = [
+      { path: "a.md", content: "alpha" },
+      { path: "b.md", content: "beta" },
+    ];
+    const client = vectorClient(
+      new Map([
+        ["chunk from a.md", [1, 0]],
+        ["chunk from b.md", [0, 1]],
+      ])
+    );
+    const storage = new FakeStorage();
+
+    const index = makeIndex(notes, client, storage);
+    await index.sync();
+    jest.mocked(client.embed).mockClear();
+
+    const count = await index.forceRebuild();
+
+    expect(count).toBe(2);
+    expect(client.embed).toHaveBeenCalledTimes(2);
+    expect(index.getChunkCount()).toBe(2);
+    expect(index.getStatus()).toBe("ready");
+    expect(Object.keys(storage.manifest?.notes ?? {})).toEqual(["a.md", "b.md"]);
   });
 });
