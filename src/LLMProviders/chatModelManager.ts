@@ -29,6 +29,33 @@ type ChatConstructorType = {
   new (config: Record<string, unknown>): BaseChatModel;
 };
 
+function isLocalBaseUrl(baseUrl: string | undefined): boolean {
+  if (!baseUrl) return false;
+  let host: string;
+  try {
+    host = new URL(baseUrl).hostname.toLowerCase().replace(/^\[|\]$/g, "");
+  } catch {
+    return false;
+  }
+  if (
+    host === "localhost" ||
+    host === "0.0.0.0" ||
+    host === "::" ||
+    host === "::1" ||
+    host.endsWith(".local") ||
+    host.endsWith(".localdomain") ||
+    host.endsWith(".lan")
+  ) {
+    return true;
+  }
+  const octets = host.split(".").map((part) => Number(part));
+  if (octets.length === 4 && octets.every((part) => Number.isInteger(part))) {
+    const [a, b] = octets;
+    return a === 10 || a === 127 || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168);
+  }
+  return false;
+}
+
 const CHAT_PROVIDER_CONSTRUCTORS: Record<string, ChatConstructorType | undefined> = {
   [ChatModelProviders.OLLAMA]: ChatOllama,
   [ChatModelProviders.LM_STUDIO]: ChatLMStudio,
@@ -87,6 +114,13 @@ export default class ChatModelManager {
       ...(maxTokens === undefined ? {} : { maxTokens }),
     };
 
+    const localNoThinkingKwargs =
+      !thinking &&
+      ((customModel.provider as ChatModelProviders) === ChatModelProviders.LM_STUDIO ||
+        isLocalBaseUrl(customModel.baseUrl))
+        ? { modelKwargs: { chat_template_kwargs: { enable_thinking: false } } }
+        : {};
+
     if ((customModel.provider as ChatModelProviders) === ChatModelProviders.OLLAMA) {
       return {
         ...baseConfig,
@@ -105,6 +139,7 @@ export default class ChatModelManager {
     if ((customModel.provider as ChatModelProviders) === ChatModelProviders.LM_STUDIO) {
       return {
         ...baseConfig,
+        ...localNoThinkingKwargs,
         modelName,
         apiKey: customModel.apiKey || "default-key",
         streamUsage: customModel.streamUsage ?? false,
@@ -117,6 +152,7 @@ export default class ChatModelManager {
 
     return {
       ...baseConfig,
+      ...localNoThinkingKwargs,
       modelName,
       apiKey: openAIFormatIsKeyless ? "keyless-endpoint" : customModel.apiKey || "",
       streamUsage: customModel.streamUsage ?? false,

@@ -67,8 +67,11 @@ function respondWithBadRequest(message: string): void {
   );
 }
 
-async function send(model: CustomModel): Promise<void> {
-  const instance = await ChatModelManager.getInstance().createModelInstanceFromBridged(model);
+async function send(model: CustomModel, thinking = true): Promise<void> {
+  const instance = await ChatModelManager.getInstance().createModelInstanceFromBridged(
+    model,
+    thinking
+  );
   await instance.invoke("hi");
 }
 
@@ -129,6 +132,38 @@ describe("chatModelManager", () => {
         await send(wireModel({ maxTokens: 8192 }));
 
         expect(body().max_tokens).toBe(8192);
+      });
+
+      it("disables template thinking for a local OpenAI-format model when thinking is off", async () => {
+        const body = captureRequestBody(OPENAI_RESPONSE);
+
+        await send(wireModel({ baseUrl: "http://127.0.0.1:8080/v1" }), false);
+
+        expect(body().chat_template_kwargs).toEqual({ enable_thinking: false });
+      });
+
+      it("omits the thinking override while thinking is on", async () => {
+        const body = captureRequestBody(OPENAI_RESPONSE);
+
+        await send(wireModel({ baseUrl: "http://127.0.0.1:8080/v1" }));
+
+        expect(body()).not.toHaveProperty("chat_template_kwargs");
+      });
+
+      it("disables template thinking for a LAN-hosted OpenAI-format model when thinking is off", async () => {
+        const body = captureRequestBody(OPENAI_RESPONSE);
+
+        await send(wireModel({ baseUrl: "http://192.168.1.50:8080/v1" }), false);
+
+        expect(body().chat_template_kwargs).toEqual({ enable_thinking: false });
+      });
+
+      it("omits the thinking override for non-local OpenAI-format endpoints", async () => {
+        const body = captureRequestBody(OPENAI_RESPONSE);
+
+        await send(wireModel(), false);
+
+        expect(body()).not.toHaveProperty("chat_template_kwargs");
       });
     });
   });
